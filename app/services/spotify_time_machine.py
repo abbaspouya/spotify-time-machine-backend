@@ -2,6 +2,7 @@ from datetime import datetime
 from collections import defaultdict
 from typing import Optional, List, Dict
 import spotipy
+from langdetect import detect, LangDetectException
 
 
 def fetch_all_liked_songs(sp: spotipy.Spotify, limit: int = 50):
@@ -75,3 +76,22 @@ def add_tracks_in_chunks(sp: spotipy.Spotify, playlist_id: str, track_ids: list[
         chunk = track_ids[i:i + chunk_size]
         if chunk:
             sp.playlist_add_items(playlist_id, chunk)
+
+
+
+
+def group_songs_by_language(songs) -> dict[str, list[str]]:
+    groups: dict[str, list[str]] = defaultdict(list)
+
+    for item in songs:
+        track = item["track"]
+        text = track["name"] + " - " + ", ".join(a["name"] for a in track["artists"])
+
+        try:
+            lang = detect(text)
+        except LangDetectException:
+            continue  # skip if cannot detect
+
+        groups[lang].append(track["id"])
+
+    return dict(groups)
