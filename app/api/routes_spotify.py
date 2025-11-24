@@ -6,7 +6,8 @@ from ..services.spotify_time_machine import (
     fetch_all_liked_songs,
     group_songs_by_period,
     add_tracks_in_chunks,
-    group_songs_by_language
+    group_songs_by_language,
+    search_artists,
 )
 from ..schemas.playlist import (CreatePlaylistRequest, CreateLanguagePlaylistRequest)
 
@@ -168,3 +169,24 @@ def create_playlist_by_language(payload: CreateLanguagePlaylistRequest):
         "track_count": len(track_ids),
         "playlist_url": playlist["external_urls"]["spotify"],
     }
+
+
+
+@router.get("/search_artists")
+def search_artists_endpoint(
+    q: str = Query(..., min_length=1, description="Search text for artist name"),
+    limit: int = Query(20, ge=1, le=50, description="Max number of artists to return"),
+):
+    """
+    Search Spotify artists by name.
+    Intended for use in search bars / autocomplete.
+    """
+    sp = get_spotify_client()
+    artists = search_artists(sp, query=q, limit=limit)
+
+    return {
+        "query": q,
+        "count": len(artists),
+        "artists": artists,
+    }
+

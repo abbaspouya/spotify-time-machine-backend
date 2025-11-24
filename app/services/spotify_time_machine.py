@@ -95,3 +95,29 @@ def group_songs_by_language(songs) -> dict[str, list[str]]:
         groups[lang].append(track["id"])
 
     return dict(groups)
+
+
+def search_artists(sp: spotipy.Spotify, query: str, limit: int = 20):
+    """
+    Search artists on Spotify by name.
+    Returns a simplified list of artist objects.
+    """
+    if not query:
+        return []
+
+    # Spotify search API
+    result = sp.search(q=query, type="artist", limit=limit)
+    items = result.get("artists", {}).get("items", [])
+
+    artists = []
+    for a in items:
+        artists.append({
+            "id": a["id"],
+            "name": a["name"],
+            "popularity": a.get("popularity"),
+            "genres": a.get("genres", []),
+            "image_url": a["images"][0]["url"] if a.get("images") else None,
+            "spotify_url": a["external_urls"]["spotify"],
+        })
+
+    return artists
