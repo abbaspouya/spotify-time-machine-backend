@@ -20,9 +20,22 @@ def ping():
 
 
 @router.get("/login")
-def login():
+def login(raw: bool = Query(False, description="If true, return the Spotify auth URL as JSON instead of redirecting")):
+    """
+    Start Spotify OAuth flow.
+
+    - Default behaviour: redirect the browser to Spotify's authorization page.
+    - If `raw=true` is provided, return the full Spotify authorization URL as JSON
+      (useful for testing from Swagger / fetch clients).
+    """
     sp_oauth = get_oauth()
     auth_url = sp_oauth.get_authorize_url()
+
+    if raw:
+        # Return the URL so you can copy / open it manually from Swagger UI
+        return {"auth_url": auth_url}
+
+    # Normal OAuth redirect (works when calling the endpoint directly from the browser)
     return RedirectResponse(url=auth_url)
 
 
