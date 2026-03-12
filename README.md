@@ -111,3 +111,7 @@ The import endpoint also accepts `exports/my-source-account-snapshot.json` or ju
 ## Frontend
 
 `frontend/` is present as a placeholder workspace. Add your FE app there and keep backend/frontend concerns separated at the repo root.
+
+## Development Notes
+
+Git workflow and commit prefix conventions are documented in `CONTRIBUTING.md`.
