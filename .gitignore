@@ -11,6 +11,8 @@ env/
 
 # Environment variables
 .env
+backend/.env
+backend/.cache
 
 # IDE / Editor
 .vscode/
@@ -25,3 +27,7 @@ Thumbs.db
 
 # FastAPI compiled stuff
 *.pid
+
+# Frontend
+frontend/node_modules/
+frontend/dist/

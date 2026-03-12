@@ -1,11 +1,30 @@
-# Spotify Backend (FastAPI)
+# Spotify
 
-## Prerequisites
+Full-stack repo layout with a FastAPI backend and a placeholder frontend workspace.
+
+## Project Structure
+
+```text
+Spotify/
+  backend/
+    app/
+    requirements.txt
+    .env
+    exports/
+  frontend/
+    package.json
+    src/
+  README.md
+```
+
+## Backend Prerequisites
+
 - Python 3.10+
 - Spotify app credentials
 
-## Environment Variables
-Create or update `.env` in the project root:
+## Backend Environment Variables
+
+Create or update `backend/.env`:
 
 ```env
 SPOTIFY_CLIENT_ID=your_client_id
@@ -15,39 +34,42 @@ SPOTIFY_REDIRECT_URI=http://127.0.0.1:8000/callback
 
 `SPOTIFY_REDIRECT_URI` must match the Redirect URI configured in your Spotify Developer dashboard.
 
-## Install Dependencies
-Optional but recommended:
+## Install Backend Dependencies
+
+From the repo root:
 
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
-```
-
-Install packages:
-
-```powershell
-pip install -r requirements.txt
+pip install -r backend/requirements.txt
 ```
 
 ## Run The Backend
-From the project root:
+
+From the repo root:
 
 ```powershell
-python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
+python -m uvicorn backend.app.main:app --reload --host 127.0.0.1 --port 8000
 ```
 
+Backend base URL: `http://127.0.0.1:8000/`
+
 ## Quick Check
+
 - Health check: `GET http://127.0.0.1:8000/ping`
 - Start Spotify auth flow: `GET http://127.0.0.1:8000/login`
 
 ## OAuth Scope Notes
-This app now uses read/write scopes for playlists, library, and follows (for snapshot export/import).
-If you previously authenticated with smaller scopes, delete `.cache` and run `/login` again to refresh consent.
+
+This app uses read/write scopes for playlists, library, and follows for snapshot export/import.
+If you previously authenticated with smaller scopes, delete `backend/.cache` and run `/login` again to refresh consent.
 
 ## Account Snapshot Export/Import
-Use these endpoints to move playlists/library data between Spotify accounts.
+
+Use these endpoints to move playlists and library data between Spotify accounts.
 
 ### 1) Export snapshot
+
 `POST /export_account_snapshot`
 
 Example request:
@@ -65,20 +87,27 @@ Example request:
 }
 ```
 
-When `write_to_file=true`, the file is written under `exports/`.
+When `write_to_file=true`, the file is written under `backend/exports/`.
 
 ### 2) Import snapshot
+
 Authenticate as the target account first, then call:
 `POST /import_account_snapshot`
 
-Example request (from file):
+Example request:
 
 ```json
 {
-  "file_path": "exports/my-source-account-snapshot.json",
+  "file_path": "backend/exports/my-source-account-snapshot.json",
   "import_playlists": true,
   "import_liked_tracks": true,
   "import_saved_albums": true,
   "import_followed_artists": true
 }
 ```
+
+The import endpoint also accepts `exports/my-source-account-snapshot.json` or just the file name when the snapshot exists inside `backend/exports/`.
+
+## Frontend
+
+`frontend/` is present as a placeholder workspace. Add your FE app there and keep backend/frontend concerns separated at the repo root.

@@ -9,6 +9,11 @@ import re
 import spotipy
 
 
+BACKEND_DIR = Path(__file__).resolve().parents[2]
+PROJECT_ROOT = BACKEND_DIR.parent
+EXPORT_DIR = BACKEND_DIR / "exports"
+
+
 def _parse_iso_datetime(value: str) -> datetime:
     raw = value.strip()
     if raw.endswith("Z"):
@@ -396,8 +401,7 @@ def export_account_snapshot(
 
 
 def write_snapshot_to_file(snapshot: dict[str, Any], output_file_name: str | None = None) -> str:
-    export_dir = Path("exports")
-    export_dir.mkdir(parents=True, exist_ok=True)
+    EXPORT_DIR.mkdir(parents=True, exist_ok=True)
 
     if output_file_name:
         file_name = _sanitize_filename(output_file_name)
@@ -408,22 +412,26 @@ def write_snapshot_to_file(snapshot: dict[str, Any], output_file_name: str | Non
         ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
         file_name = f"spotify-snapshot-{user_id}-{ts}.json"
 
-    output_path = export_dir / file_name
+    output_path = EXPORT_DIR / file_name
     output_path.write_text(json.dumps(snapshot, indent=2), encoding="utf-8")
-    return str(output_path)
+    return output_path.relative_to(PROJECT_ROOT).as_posix()
 
 
 def load_snapshot_from_file(file_path: str) -> dict[str, Any]:
     path = Path(file_path)
 
     if not path.is_absolute():
-        cwd_candidate = Path.cwd() / path
-        exports_candidate = Path.cwd() / "exports" / path
+        candidates = [
+            Path.cwd() / path,
+            PROJECT_ROOT / path,
+            BACKEND_DIR / path,
+            EXPORT_DIR / path,
+        ]
 
-        if cwd_candidate.exists():
-            path = cwd_candidate
-        else:
-            path = exports_candidate
+        for candidate in candidates:
+            if candidate.exists():
+                path = candidate
+                break
 
     if not path.exists():
         raise FileNotFoundError(f"Snapshot file not found: {path}")
