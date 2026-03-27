@@ -1,0 +1,74 @@
+@import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 45 57% 96%;
+    --foreground: 196 25% 14%;
+    --card: 0 0% 100%;
+    --card-foreground: 196 25% 14%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 196 25% 14%;
+    --primary: 141 73% 38%;
+    --primary-foreground: 48 100% 98%;
+    --secondary: 186 31% 89%;
+    --secondary-foreground: 196 27% 18%;
+    --muted: 38 38% 92%;
+    --muted-foreground: 195 11% 37%;
+    --accent: 22 86% 62%;
+    --accent-foreground: 48 100% 98%;
+    --destructive: 0 74% 53%;
+    --destructive-foreground: 48 100% 98%;
+    --border: 34 32% 84%;
+    --input: 34 32% 84%;
+    --ring: 141 73% 38%;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply min-h-screen bg-background font-body text-foreground antialiased;
+    background-image:
+      radial-gradient(circle at top left, rgba(250, 139, 73, 0.16), transparent 26%),
+      radial-gradient(circle at top right, rgba(29, 185, 84, 0.14), transparent 22%),
+      linear-gradient(180deg, rgba(255, 255, 255, 0.6), rgba(255, 255, 255, 0)),
+      linear-gradient(rgba(19, 53, 58, 0.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(19, 53, 58, 0.04) 1px, transparent 1px);
+    background-size: auto, auto, auto, 22px 22px, 22px 22px;
+    background-position: center, center, center, center, center;
+  }
+
+  #root {
+    @apply min-h-screen;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    @apply font-display tracking-tight;
+  }
+}
+
+@layer components {
+  .section-shell {
+    @apply rounded-3xl border border-white/70 bg-white/80 p-5 shadow-panel backdrop-blur md:p-6;
+  }
+
+  .hero-badge {
+    @apply inline-flex items-center gap-2 rounded-full border border-foreground/10 bg-white/75 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-foreground/70;
+  }
+
+  .metric-pill {
+    @apply inline-flex items-center rounded-full bg-secondary/70 px-3 py-1 text-xs font-medium text-secondary-foreground;
+  }
+}

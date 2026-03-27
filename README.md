@@ -30,9 +30,15 @@ Create or update `backend/.env`:
 SPOTIFY_CLIENT_ID=your_client_id
 SPOTIFY_CLIENT_SECRET=your_client_secret
 SPOTIFY_REDIRECT_URI=http://127.0.0.1:8000/callback
+FRONTEND_URL=http://127.0.0.1:5173
+# Optional: comma-separated override for allowed frontend origins
+# CORS_ALLOW_ORIGINS=http://127.0.0.1:5173,http://localhost:5173
+# Optional: frontend route that receives auth status redirects
+# FRONTEND_AUTH_CALLBACK_PATH=/auth/callback
 ```
 
 `SPOTIFY_REDIRECT_URI` must match the Redirect URI configured in your Spotify Developer dashboard.
+`FRONTEND_URL` is the base URL the backend uses after Spotify login succeeds or fails.
 
 ## Install Backend Dependencies
 
@@ -58,6 +64,8 @@ Backend base URL: `http://127.0.0.1:8000/`
 
 - Health check: `GET http://127.0.0.1:8000/ping`
 - Start Spotify auth flow: `GET http://127.0.0.1:8000/login`
+- Check backend auth state without exposing the Spotify token: `GET http://127.0.0.1:8000/auth_status`
+- After Spotify auth completes, the backend redirects to `FRONTEND_URL/auth/callback?status=success` by default.
 
 ## OAuth Scope Notes
 
@@ -110,7 +118,39 @@ The import endpoint also accepts `exports/my-source-account-snapshot.json` or ju
 
 ## Frontend
 
-`frontend/` is present as a placeholder workspace. Add your FE app there and keep backend/frontend concerns separated at the repo root.
+The frontend now uses React + Vite + TypeScript + TanStack Query with a Tailwind/shadcn-style component layer.
+
+Create `frontend/.env` if you want to override the backend base URL:
+
+```env
+VITE_API_BASE_URL=http://127.0.0.1:8000
+```
+
+Install frontend dependencies:
+
+```powershell
+cd frontend
+npm install
+```
+
+Run the frontend:
+
+```powershell
+cd frontend
+npm run dev
+```
+
+The local frontend dev server runs at `http://127.0.0.1:5173/`.
+
+Current frontend MVP includes:
+
+- Spotify auth status + backend session refresh
+- Liked songs grouped by time period with playlist creation
+- Language grouping with playlist creation
+- Snapshot export/import forms
+- Artist search powered by the existing backend endpoint
+
+For local development, the backend already allows `http://127.0.0.1:5173` and `http://localhost:5173` through CORS by default.
 
 ## Development Notes
 

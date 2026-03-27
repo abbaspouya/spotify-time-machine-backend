@@ -1,28 +1,52 @@
-from fastapi import APIRouter, Request, Query, HTTPException
+from urllib.parse import urlencode
+
+from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import RedirectResponse
 from spotipy.exceptions import SpotifyException
 
-from ..core.auth import get_spotify_client, get_oauth
-from ..services.account_snapshot import (
-    export_account_snapshot,
-    write_snapshot_to_file,
-    load_snapshot_from_file,
-    import_account_snapshot,
-)
-from ..services.spotify_time_machine import (
-    fetch_all_liked_songs,
-    group_songs_by_period,
-    add_tracks_in_chunks,
-    group_songs_by_language,
-    search_artists,
-)
-from ..schemas.playlist import (CreatePlaylistRequest, CreateLanguagePlaylistRequest)
+from ..core.auth import get_oauth, get_spotify_client
+from ..core.config import FRONTEND_AUTH_CALLBACK_PATH, FRONTEND_URL
 from ..schemas.account_snapshot import (
     ExportAccountSnapshotRequest,
     ImportAccountSnapshotRequest,
 )
+from ..schemas.playlist import CreateLanguagePlaylistRequest, CreatePlaylistRequest
+from ..services.account_snapshot import (
+    export_account_snapshot,
+    import_account_snapshot,
+    load_snapshot_from_file,
+    write_snapshot_to_file,
+)
+from ..services.spotify_time_machine import (
+    add_tracks_in_chunks,
+    fetch_all_liked_songs,
+    group_songs_by_language,
+    group_songs_by_period,
+    search_artists,
+)
 
 router = APIRouter()
+
+
+def _build_frontend_redirect(status: str, detail: str | None = None) -> str:
+    target = f"{FRONTEND_URL}{FRONTEND_AUTH_CALLBACK_PATH}"
+    params = {"status": status}
+    if detail:
+        params["detail"] = detail
+    return f"{target}?{urlencode(params)}"
+
+
+def _build_auth_status_response() -> dict[str, object]:
+    token = get_oauth().get_cached_token()
+    if not token:
+        return {"authenticated": False}
+
+    return {
+        "authenticated": True,
+        "expires_at": token.get("expires_at"),
+        "scope": token.get("scope"),
+        "token_type": token.get("token_type"),
+    }
 
 
 @router.get("/ping")
@@ -31,7 +55,12 @@ def ping():
 
 
 @router.get("/login")
-def login(raw: bool = Query(False, description="If true, return the Spotify auth URL as JSON instead of redirecting")):
+def login(
+    raw: bool = Query(
+        False,
+        description="If true, return the Spotify auth URL as JSON instead of redirecting",
+    )
+):
     """
     Start Spotify OAuth flow.
 
@@ -46,33 +75,46 @@ def login(raw: bool = Query(False, description="If true, return the Spotify auth
         auth_url = f"{auth_url}{separator}show_dialog=true"
 
     if raw:
-        # Return the URL so you can copy / open it manually from Swagger UI
         return {"auth_url": auth_url}
 
-    # Normal OAuth redirect (works when calling the endpoint directly from the browser)
     return RedirectResponse(url=auth_url)
 
 
 @router.get("/callback")
 def callback(request: Request):
     sp_oauth = get_oauth()
+    error = request.query_params.get("error")
     code = request.query_params.get("code")
+
+    if error:
+        return RedirectResponse(url=_build_frontend_redirect("error", error), status_code=303)
+
     if not code:
-        return {"error": "No code provided in callback"}
+        return RedirectResponse(
+            url=_build_frontend_redirect("error", "No code provided in callback"),
+            status_code=303,
+        )
 
-    token_info = sp_oauth.get_access_token(code, as_dict=True)
+    try:
+        sp_oauth.get_access_token(code, as_dict=True)
+    except Exception as exc:
+        return RedirectResponse(
+            url=_build_frontend_redirect("error", f"Authorization failed: {exc}"),
+            status_code=303,
+        )
 
-    return {
-        "message": "Authorized!",
-        "token_info": token_info,
-    }
+    return RedirectResponse(url=_build_frontend_redirect("success"), status_code=303)
+
+
+@router.get("/auth_status")
+def auth_status():
+    return _build_auth_status_response()
 
 
 @router.get("/get_token")
 def get_token():
-    sp_oauth = get_oauth()
-    token = sp_oauth.get_cached_token()
-    return token or {"error": "No cached token"}
+    # Legacy route kept for compatibility, but do not expose tokens to the browser.
+    return _build_auth_status_response()
 
 
 @router.get("/whoami")
@@ -162,16 +204,12 @@ def create_playlist_for_group(payload: CreatePlaylistRequest):
     }
 
 
-
-
 @router.get("/group_by_language")
 def group_by_language():
     sp = get_spotify_client()
     songs = fetch_all_liked_songs(sp)
     groups = group_songs_by_language(songs)
     return {"groups": groups}
-
-
 
 
 @router.post("/create_playlist_by_language")
@@ -190,7 +228,7 @@ def create_playlist_by_language(payload: CreateLanguagePlaylistRequest):
     me = sp.current_user()
     user_id = me["id"]
 
-    name = payload.playlist_name or f"Liked Songs – {payload.language_code.upper()}"
+    name = payload.playlist_name or f"Liked Songs - {payload.language_code.upper()}"
     description = f"Liked songs detected as {payload.language_code.upper()}"
 
     playlist = sp.user_playlist_create(
@@ -211,7 +249,6 @@ def create_playlist_by_language(payload: CreateLanguagePlaylistRequest):
         "track_count": len(track_ids),
         "playlist_url": playlist["external_urls"]["spotify"],
     }
-
 
 
 @router.get("/search_artists")
@@ -317,4 +354,3 @@ def import_account_snapshot_endpoint(payload: ImportAccountSnapshotRequest):
         "message": "Snapshot import completed",
         "result": result,
     }
-
