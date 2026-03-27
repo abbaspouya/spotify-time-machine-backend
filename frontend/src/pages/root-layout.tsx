@@ -1,17 +1,10 @@
 import { Headphones, LayoutGrid, Music2, Orbit, Sparkles } from "lucide-react"
-import { Link, Outlet } from "react-router-dom"
+import { Link, NavLink, Outlet } from "react-router-dom"
 
+import { primaryNavigation, workspaceNavigationItem } from "@/app/navigation"
 import { buttonVariants } from "@/components/ui/button"
 import { getDocsUrl } from "@/lib/api"
 import { cn } from "@/lib/utils"
-
-const navItems = [
-  { href: "#overview", label: "Overview" },
-  { href: "#grouping", label: "Grouping" },
-  { href: "#language", label: "Language" },
-  { href: "#snapshots", label: "Snapshots" },
-  { href: "#search", label: "Artists" },
-]
 
 export function RootLayout() {
   return (
@@ -20,37 +13,51 @@ export function RootLayout() {
       <div className="pointer-events-none absolute inset-x-0 top-[12rem] z-0 mx-auto h-[26rem] max-w-6xl rounded-full bg-[radial-gradient(circle,_rgba(250,139,73,0.12),_transparent_58%)] blur-3xl" />
 
       <header className="sticky top-0 z-20 border-b border-white/60 bg-background/80 backdrop-blur-xl">
-        <div className="container flex items-center justify-between gap-4 py-4">
+        <div className="container flex flex-col gap-4 py-4 xl:flex-row xl:items-center xl:justify-between">
           <Link to="/" className="flex items-center gap-3">
             <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-foreground text-background shadow-panel">
               <Music2 className="h-5 w-5" />
             </div>
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-foreground/55">Spotify Atelier</p>
-              <p className="font-display text-lg">Library tools for playlist tinkerers</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-foreground/55">Spotify Time Machine</p>
+              <p className="font-display text-lg">Clearer journeys for playlists and library transfers</p>
             </div>
           </Link>
 
-          <nav className="hidden items-center gap-2 lg:flex">
-            {navItems.map((item) => (
-              <a
-                key={item.href}
-                href={item.href}
-                className="rounded-full px-4 py-2 text-sm text-foreground/72 transition-colors hover:bg-white/85 hover:text-foreground"
-              >
-                {item.label}
-              </a>
-            ))}
-          </nav>
+          <div className="flex flex-col gap-3 xl:items-end">
+            <nav className="flex flex-wrap items-center gap-2">
+              {primaryNavigation.map((item) => (
+                <NavLink
+                  key={item.to}
+                  to={item.to}
+                  className={({ isActive }) =>
+                    cn(
+                      "rounded-full px-4 py-2 text-sm transition-colors",
+                      isActive
+                        ? "bg-white text-foreground shadow-panel"
+                        : "text-foreground/72 hover:bg-white/85 hover:text-foreground",
+                    )
+                  }
+                >
+                  {item.label}
+                </NavLink>
+              ))}
+            </nav>
 
-          <a
-            href={getDocsUrl()}
-            target="_blank"
-            rel="noreferrer"
-            className={cn(buttonVariants({ variant: "outline", size: "sm" }), "hidden md:inline-flex")}
-          >
-            API Docs
-          </a>
+            <div className="flex flex-wrap items-center gap-2">
+              <Link to={workspaceNavigationItem.to} className={buttonVariants({ variant: "secondary", size: "sm" })}>
+                {workspaceNavigationItem.label}
+              </Link>
+              <a
+                href={getDocsUrl()}
+                target="_blank"
+                rel="noreferrer"
+                className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
+              >
+                API Docs
+              </a>
+            </div>
+          </div>
         </div>
       </header>
 
@@ -77,7 +84,7 @@ export function RootLayout() {
 
           <div className="flex items-center gap-2">
             <LayoutGrid className="h-4 w-4" />
-            <span>Built as a local-first control panel for your Spotify experiments.</span>
+            <span>Structured into clearer product routes while the original workspace remains available.</span>
           </div>
         </div>
       </footer>
