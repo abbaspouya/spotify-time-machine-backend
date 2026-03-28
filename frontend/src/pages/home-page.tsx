@@ -8,7 +8,7 @@ import { formatExpiresAt, getErrorMessage, useSpotifySession } from "@/features/
 import { getDocsUrl } from "@/lib/api"
 import { cn } from "@/lib/utils"
 
-export function ConnectPage() {
+export function HomePage() {
   const { authStatusQuery, isAuthenticated, whoAmIQuery, handleSpotifyLogin, refreshSession } = useSpotifySession()
 
   return (
@@ -16,7 +16,7 @@ export function ConnectPage() {
       <section className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
         <div className="section-shell animate-fade-up overflow-hidden">
           <div className="flex flex-wrap items-center gap-3">
-            <span className="hero-badge">Entry Point</span>
+            <span className="hero-badge">Home</span>
             <Badge variant={isAuthenticated ? "default" : "outline"}>
               {isAuthenticated ? "Spotify connected" : "Spotify not connected"}
             </Badge>
@@ -24,11 +24,11 @@ export function ConnectPage() {
 
           <div className="mt-6 space-y-4">
             <h1 className="max-w-3xl text-4xl leading-tight md:text-5xl">
-              Connect Spotify once, then move into the product flows that matter.
+              Start here, connect Spotify, and jump into the flow you need.
             </h1>
             <p className="max-w-2xl text-base text-muted-foreground md:text-lg">
-              Start here to connect your account, confirm that everything is ready, and then head into playlist
-              creation or library transfer.
+              Home now doubles as your connection page and quick launcher, so you can verify the active account and
+              move straight into playlist creation, transfers, or experiments.
             </p>
           </div>
 
@@ -53,9 +53,9 @@ export function ConnectPage() {
             <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/12 text-primary">
               <ShieldCheck className="h-6 w-6" />
             </div>
-            <CardTitle>Connection status</CardTitle>
+            <CardTitle>Current session</CardTitle>
             <CardDescription>
-              Keep your current Spotify connection visible, refresh it when needed, and confirm which account is active in this browser session.
+              Use Home as the quick place to confirm which account is active, refresh the session, and launch the next page.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -89,8 +89,8 @@ export function ConnectPage() {
             ) : null}
 
             <div className="flex flex-wrap gap-3">
-              <Link to="/workspace" className={buttonVariants({ variant: "secondary" })}>
-                Open overview
+              <Link to="/time-machine" className={buttonVariants({ variant: "secondary" })}>
+                Open Time Machine
               </Link>
               <a
                 href={getDocsUrl()}
@@ -150,15 +150,10 @@ export function ConnectPage() {
           </CardHeader>
           <CardContent className="space-y-4 text-sm text-muted-foreground">
             <p>Explore language grouping and artist search without interrupting the main flows.</p>
-            <div className="flex flex-wrap gap-3">
-              <Link to="/advanced" className={buttonVariants({ variant: "secondary" })}>
-                Open Advanced
-                <ArrowRight className="h-4 w-4" />
-              </Link>
-              <Link to="/workspace" className={buttonVariants({ variant: "outline" })}>
-                Open Overview
-              </Link>
-            </div>
+            <Link to="/advanced" className={buttonVariants({ variant: "secondary" })}>
+              Open Advanced
+              <ArrowRight className="h-4 w-4" />
+            </Link>
           </CardContent>
         </Card>
       </section>

@@ -2,8 +2,7 @@ import { Navigate, createBrowserRouter } from "react-router-dom"
 
 import { AdvancedPage } from "@/pages/advanced-page"
 import { AuthCallbackPage } from "@/pages/auth-callback-page"
-import { ConnectPage } from "@/pages/connect-page"
-import { DashboardPage } from "@/pages/dashboard-page"
+import { HomePage } from "@/pages/home-page"
 import { RootLayout } from "@/pages/root-layout"
 import { TimeMachinePage } from "@/pages/time-machine-page"
 import { TransferLibraryPage } from "@/pages/transfer-library-page"
@@ -15,11 +14,11 @@ export const router = createBrowserRouter([
     children: [
       {
         index: true,
-        element: <Navigate to="connect" replace />,
+        element: <HomePage />,
       },
       {
         path: "connect",
-        element: <ConnectPage />,
+        element: <Navigate to="/" replace />,
       },
       {
         path: "time-machine",
@@ -32,10 +31,6 @@ export const router = createBrowserRouter([
       {
         path: "advanced",
         element: <AdvancedPage />,
-      },
-      {
-        path: "workspace",
-        element: <DashboardPage />,
       },
       {
         path: "auth/callback",

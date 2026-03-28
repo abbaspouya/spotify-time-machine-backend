@@ -13,7 +13,7 @@ const features = [
 ]
 
 const currentLinks = [
-  { to: "/connect", label: "Check connection" },
+  { to: "/", label: "Open Home" },
   { to: "/transfer-library", label: "Open transfer flow" },
 ]
 
@@ -36,8 +36,8 @@ export function TimeMachinePage() {
           </div>
 
           <div className="mt-8 flex flex-wrap gap-3">
-            <Link to="/connect" className={buttonVariants({ variant: "default" })}>
-              Start with connection
+            <Link to="/" className={buttonVariants({ variant: "default" })}>
+              Open Home
             </Link>
             <a href="#time-machine-tool" className={buttonVariants({ variant: "outline" })}>
               Jump to builder

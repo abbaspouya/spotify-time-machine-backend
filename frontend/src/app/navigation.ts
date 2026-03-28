@@ -1,11 +1,6 @@
 export const primaryNavigation = [
-  { to: "/connect", label: "Connect Spotify" },
+  { to: "/", label: "Home" },
   { to: "/time-machine", label: "Time Machine" },
   { to: "/transfer-library", label: "Transfer Library" },
   { to: "/advanced", label: "Advanced" },
 ] as const
-
-export const workspaceNavigationItem = {
-  to: "/workspace",
-  label: "Overview",
-} as const

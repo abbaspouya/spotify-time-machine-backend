@@ -1,7 +1,7 @@
 import { Headphones, LayoutGrid, Music2, Orbit, Sparkles } from "lucide-react"
 import { Link, NavLink, Outlet } from "react-router-dom"
 
-import { primaryNavigation, workspaceNavigationItem } from "@/app/navigation"
+import { primaryNavigation } from "@/app/navigation"
 import { buttonVariants } from "@/components/ui/button"
 import { getDocsUrl } from "@/lib/api"
 import { cn } from "@/lib/utils"
@@ -29,6 +29,7 @@ export function RootLayout() {
               {primaryNavigation.map((item) => (
                 <NavLink
                   key={item.to}
+                  end={item.to === "/"}
                   to={item.to}
                   className={({ isActive }) =>
                     cn(
@@ -45,9 +46,6 @@ export function RootLayout() {
             </nav>
 
             <div className="flex flex-wrap items-center gap-2">
-              <Link to={workspaceNavigationItem.to} className={buttonVariants({ variant: "secondary", size: "sm" })}>
-                {workspaceNavigationItem.label}
-              </Link>
               <a
                 href={getDocsUrl()}
                 target="_blank"
