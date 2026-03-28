@@ -1,51 +1,15 @@
-import { useQuery, useQueryClient } from "@tanstack/react-query"
-import { ArrowRight, Disc3, RefreshCcw, ShieldCheck, UserRound } from "lucide-react"
+import { ArrowRight, ArrowRightLeft, Disc3, RefreshCcw, ShieldCheck, Sparkles, UserRound } from "lucide-react"
 import { Link } from "react-router-dom"
 
 import { Badge } from "@/components/ui/badge"
 import { Button, buttonVariants } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { getAuthStatus, getDocsUrl, getLoginUrl, getWhoAmI } from "@/lib/api"
+import { formatExpiresAt, getErrorMessage, useSpotifySession } from "@/features/spotify/use-spotify-session"
+import { getDocsUrl } from "@/lib/api"
 import { cn } from "@/lib/utils"
 
-function formatExpiresAt(value?: number | null) {
-  if (!value) {
-    return "Unknown"
-  }
-
-  return new Date(value * 1000).toLocaleString()
-}
-
-function getErrorMessage(error: unknown) {
-  return error instanceof Error ? error.message : "Something went wrong."
-}
-
 export function ConnectPage() {
-  const queryClient = useQueryClient()
-
-  const authStatusQuery = useQuery({
-    queryKey: ["authStatus"],
-    queryFn: getAuthStatus,
-  })
-
-  const isAuthenticated = authStatusQuery.data?.authenticated === true
-
-  const whoAmIQuery = useQuery({
-    queryKey: ["whoami"],
-    queryFn: getWhoAmI,
-    enabled: isAuthenticated,
-  })
-
-  const handleSpotifyLogin = () => {
-    window.location.href = getLoginUrl()
-  }
-
-  const handleRefreshAuth = async () => {
-    await Promise.all([
-      queryClient.invalidateQueries({ queryKey: ["authStatus"] }),
-      queryClient.invalidateQueries({ queryKey: ["whoami"] }),
-    ])
-  }
+  const { authStatusQuery, isAuthenticated, whoAmIQuery, handleSpotifyLogin, refreshSession } = useSpotifySession()
 
   return (
     <div className="container space-y-8 py-8 md:py-12">
@@ -73,7 +37,7 @@ export function ConnectPage() {
               <Disc3 className="h-4 w-4" />
               Connect Spotify
             </Button>
-            <Button variant="outline" onClick={() => void handleRefreshAuth()}>
+            <Button variant="outline" onClick={() => void refreshSession()}>
               <RefreshCcw className="h-4 w-4" />
               Refresh status
             </Button>
@@ -144,31 +108,57 @@ export function ConnectPage() {
       <section className="grid gap-6 md:grid-cols-3">
         <Card className="animate-fade-up [animation-delay:180ms]">
           <CardHeader>
-            <CardTitle>1. Connect</CardTitle>
-            <CardDescription>Authenticate once and confirm the session is ready.</CardDescription>
+            <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-2xl bg-primary/12 text-primary">
+              <Sparkles className="h-5 w-5" />
+            </div>
+            <CardTitle>Time Machine</CardTitle>
+            <CardDescription>Turn your liked songs into grouped time capsules and create playlists from them.</CardDescription>
           </CardHeader>
-          <CardContent className="text-sm text-muted-foreground">
-            This page becomes the stable entry step for the rest of the product.
+          <CardContent className="space-y-4 text-sm text-muted-foreground">
+            <p>The full grouping and playlist creation flow now lives in its own dedicated product route.</p>
+            <Link to="/time-machine" className={buttonVariants({ variant: "secondary" })}>
+              Open Time Machine
+              <ArrowRight className="h-4 w-4" />
+            </Link>
           </CardContent>
         </Card>
 
         <Card className="animate-fade-up [animation-delay:220ms]">
           <CardHeader>
-            <CardTitle>2. Choose a journey</CardTitle>
-            <CardDescription>Time Machine and Transfer Library become the primary flows.</CardDescription>
+            <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-2xl bg-primary/12 text-primary">
+              <ArrowRightLeft className="h-5 w-5" />
+            </div>
+            <CardTitle>Transfer Library</CardTitle>
+            <CardDescription>Export and import account snapshots from a migration-focused page.</CardDescription>
           </CardHeader>
-          <CardContent className="text-sm text-muted-foreground">
-            We are separating focused product routes first, then moving each working tool into its own page.
+          <CardContent className="space-y-4 text-sm text-muted-foreground">
+            <p>The snapshot tooling no longer has to compete for space inside the old all-in-one dashboard.</p>
+            <Link to="/transfer-library" className={buttonVariants({ variant: "secondary" })}>
+              Open Transfer Library
+              <ArrowRight className="h-4 w-4" />
+            </Link>
           </CardContent>
         </Card>
 
         <Card className="animate-fade-up [animation-delay:260ms]">
           <CardHeader>
-            <CardTitle>3. Keep power tools accessible</CardTitle>
-            <CardDescription>The original cockpit stays available while we split it out.</CardDescription>
+            <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-2xl bg-primary/12 text-primary">
+              <Disc3 className="h-5 w-5" />
+            </div>
+            <CardTitle>Advanced</CardTitle>
+            <CardDescription>Experimental tools like language grouping and artist lookup now have their own home.</CardDescription>
           </CardHeader>
-          <CardContent className="text-sm text-muted-foreground">
-            The full MVP remains under <code>/workspace</code> during the transition.
+          <CardContent className="space-y-4 text-sm text-muted-foreground">
+            <p>The workspace route is now a lighter overview, while the actual experimental tools live in Advanced.</p>
+            <div className="flex flex-wrap gap-3">
+              <Link to="/advanced" className={buttonVariants({ variant: "secondary" })}>
+                Open Advanced
+                <ArrowRight className="h-4 w-4" />
+              </Link>
+              <Link to="/workspace" className={buttonVariants({ variant: "outline" })}>
+                Open Workspace
+              </Link>
+            </div>
           </CardContent>
         </Card>
       </section>

@@ -1,6 +1,8 @@
 import { Languages, Microscope, Search, Sparkles } from "lucide-react"
 import { Link } from "react-router-dom"
 
+import { ArtistSearchLab } from "@/features/advanced/artist-search-lab"
+import { LanguageLab } from "@/features/advanced/language-lab"
 import { Badge } from "@/components/ui/badge"
 import { buttonVariants } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -30,12 +32,12 @@ export function AdvancedPage() {
           </div>
 
           <div className="mt-8 flex flex-wrap gap-3">
-            <Link to="/workspace#language" className={buttonVariants({ variant: "secondary" })}>
+            <a href="#language-lab" className={buttonVariants({ variant: "secondary" })}>
               Open language tools
-            </Link>
-            <Link to="/workspace#search" className={buttonVariants({ variant: "outline" })}>
+            </a>
+            <a href="#artist-search-lab" className={buttonVariants({ variant: "outline" })}>
               Open artist search
-            </Link>
+            </a>
           </div>
         </div>
 
@@ -45,7 +47,7 @@ export function AdvancedPage() {
               <Microscope className="h-6 w-6" />
             </div>
             <CardTitle>What stays advanced</CardTitle>
-            <CardDescription>These capabilities are real, but they are not yet the simplest story to lead with.</CardDescription>
+            <CardDescription>These capabilities are real and working, but they are still better framed as experiments than core flows.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             {advancedAreas.map((area) => (
@@ -56,6 +58,10 @@ export function AdvancedPage() {
           </CardContent>
         </Card>
       </section>
+
+      <LanguageLab />
+
+      <ArtistSearchLab />
 
       <section className="grid gap-6 md:grid-cols-[1fr_1fr]">
         <Card className="animate-fade-up [animation-delay:180ms]">

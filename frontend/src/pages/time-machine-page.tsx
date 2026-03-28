@@ -1,6 +1,7 @@
 import { CalendarRange, Clock3, Music4, Wand2 } from "lucide-react"
 import { Link } from "react-router-dom"
 
+import { TimeMachineTool } from "@/features/time-machine/time-machine-tool"
 import { Badge } from "@/components/ui/badge"
 import { buttonVariants } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -12,8 +13,8 @@ const features = [
 ]
 
 const currentLinks = [
-  { to: "/workspace#grouping", label: "Open grouping tools" },
-  { to: "/workspace#overview", label: "Open current dashboard" },
+  { to: "/connect", label: "Check connection" },
+  { to: "/transfer-library", label: "Open transfer flow" },
 ]
 
 export function TimeMachinePage() {
@@ -38,9 +39,9 @@ export function TimeMachinePage() {
             <Link to="/connect" className={buttonVariants({ variant: "default" })}>
               Start with connection
             </Link>
-            <Link to="/workspace#grouping" className={buttonVariants({ variant: "outline" })}>
-              Use the current grouping flow
-            </Link>
+            <a href="#time-machine-tool" className={buttonVariants({ variant: "outline" })}>
+              Jump to builder
+            </a>
           </div>
         </div>
 
@@ -50,7 +51,7 @@ export function TimeMachinePage() {
               <Clock3 className="h-6 w-6" />
             </div>
             <CardTitle>What this page will own</CardTitle>
-            <CardDescription>Task 1 sets the route and navigation. Task 2 will move the working tools here.</CardDescription>
+            <CardDescription>The full grouping and playlist creation workflow now belongs here end to end.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             {features.map((feature) => (
@@ -65,8 +66,8 @@ export function TimeMachinePage() {
       <section className="grid gap-6 md:grid-cols-[1fr_1fr]">
         <Card className="animate-fade-up [animation-delay:180ms]">
           <CardHeader>
-            <CardTitle>Current live tools</CardTitle>
-            <CardDescription>The real functionality still lives in the transitional workspace for now.</CardDescription>
+            <CardTitle>Flow neighbors</CardTitle>
+            <CardDescription>Use the dedicated routes around this one instead of bouncing back to the old dashboard.</CardDescription>
           </CardHeader>
           <CardContent className="flex flex-wrap gap-3">
             {currentLinks.map((link) => (
@@ -98,6 +99,8 @@ export function TimeMachinePage() {
           </CardContent>
         </Card>
       </section>
+
+      <TimeMachineTool />
     </div>
   )
 }

@@ -1,6 +1,7 @@
 import { AlertTriangle, ArrowRightLeft, Download, ShieldCheck, Upload } from "lucide-react"
 import { Link } from "react-router-dom"
 
+import { TransferLibraryTool } from "@/features/transfer-library/transfer-library-tool"
 import { Badge } from "@/components/ui/badge"
 import { buttonVariants } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -33,9 +34,9 @@ export function TransferLibraryPage() {
             <Link to="/connect" className={buttonVariants({ variant: "default" })}>
               Check connection first
             </Link>
-            <Link to="/workspace#snapshots" className={buttonVariants({ variant: "outline" })}>
-              Open current snapshot tools
-            </Link>
+            <a href="#transfer-tools" className={buttonVariants({ variant: "outline" })}>
+              Jump to transfer tools
+            </a>
           </div>
         </div>
 
@@ -45,7 +46,7 @@ export function TransferLibraryPage() {
               <ArrowRightLeft className="h-6 w-6" />
             </div>
             <CardTitle>What belongs here</CardTitle>
-            <CardDescription>This becomes a focused transfer experience instead of one card inside a giant dashboard.</CardDescription>
+            <CardDescription>The working export and import flow now lives here instead of being buried in a mixed dashboard.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             {transferSteps.map((step) => (
@@ -60,17 +61,17 @@ export function TransferLibraryPage() {
       <section className="grid gap-6 md:grid-cols-[1fr_1fr]">
         <Card className="animate-fade-up [animation-delay:180ms]">
           <CardHeader>
-            <CardTitle>Current transitional links</CardTitle>
-            <CardDescription>The working export and import forms are still available while we re-home them.</CardDescription>
+            <CardTitle>Related routes</CardTitle>
+            <CardDescription>Use the dedicated product routes around this one now that the snapshot tools are here.</CardDescription>
           </CardHeader>
           <CardContent className="flex flex-wrap gap-3">
-            <Link to="/workspace#snapshots" className={buttonVariants({ variant: "secondary" })}>
+            <Link to="/connect" className={buttonVariants({ variant: "secondary" })}>
               <Download className="h-4 w-4" />
-              Export and import tools
+              Connection page
             </Link>
-            <Link to="/workspace" className={buttonVariants({ variant: "outline" })}>
+            <Link to="/advanced" className={buttonVariants({ variant: "outline" })}>
               <Upload className="h-4 w-4" />
-              Full workspace
+              Advanced tools
             </Link>
           </CardContent>
         </Card>
@@ -92,6 +93,8 @@ export function TransferLibraryPage() {
           </CardContent>
         </Card>
       </section>
+
+      <TransferLibraryTool />
     </div>
   )
 }
