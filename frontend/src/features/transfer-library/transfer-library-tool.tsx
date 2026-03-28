@@ -1,18 +1,21 @@
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import type { ChangeEvent, FormEvent } from "react"
-import { AlertTriangle, CheckCircle2, Download, FileUp, LoaderCircle } from "lucide-react"
+import { AlertTriangle, CheckCircle2, Download, FileUp, LoaderCircle, ShieldAlert } from "lucide-react"
 import { useMutation } from "@tanstack/react-query"
 
-import { exportSnapshot, importSnapshot } from "@/lib/api"
+import { previewSnapshotImport, startExportSnapshotJob, startImportSnapshotJob } from "@/lib/api"
 import type {
   ExportSnapshotResponse,
   ImportedPlaylistSummary,
+  SnapshotImportPreviewResponse,
   ImportSnapshotResponse,
   ImportSnapshotSummary,
   SnapshotCounts,
   SnapshotDocument,
 } from "@/lib/types"
 import { AuthRequiredNotice } from "@/features/spotify/auth-required-notice"
+import { JobStatusCard } from "@/features/jobs/job-status-card"
+import { isActiveJobStatus, useAsyncJob } from "@/features/jobs/use-async-job"
 import { getErrorMessage, useSpotifySession } from "@/features/spotify/use-spotify-session"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -45,18 +48,18 @@ const exportCountLabels: Array<{ key: keyof SnapshotCounts; label: string }> = [
 ]
 
 const primaryImportSummaryLabels: Array<{ key: keyof ImportSnapshotSummary; label: string }> = [
-  { key: "playlists_created", label: "Playlists created" },
-  { key: "playlist_tracks_added", label: "Playlist tracks added" },
-  { key: "liked_tracks_added", label: "Liked songs added" },
-  { key: "saved_albums_added", label: "Albums saved" },
-  { key: "followed_artists_added", label: "Artists followed" },
+  { key: "playlists_created", label: "Playlists to create" },
+  { key: "playlist_tracks_added", label: "Playlist tracks to add" },
+  { key: "liked_tracks_added", label: "Liked songs to add" },
+  { key: "saved_albums_added", label: "Albums to save" },
+  { key: "followed_artists_added", label: "Artists to follow" },
 ]
 
 const removalSummaryLabels: Array<{ key: keyof ImportSnapshotSummary; label: string }> = [
-  { key: "playlists_removed", label: "Playlists removed first" },
-  { key: "liked_tracks_removed", label: "Liked songs removed first" },
-  { key: "saved_albums_removed", label: "Saved albums removed first" },
-  { key: "followed_artists_removed", label: "Artists unfollowed first" },
+  { key: "playlists_removed", label: "Playlists to remove first" },
+  { key: "liked_tracks_removed", label: "Liked songs to remove first" },
+  { key: "saved_albums_removed", label: "Saved albums to remove first" },
+  { key: "followed_artists_removed", label: "Artists to unfollow first" },
 ]
 
 const failureSummaryLabels: Array<{ key: keyof ImportSnapshotSummary; label: string }> = [
@@ -69,6 +72,11 @@ const failureSummaryLabels: Array<{ key: keyof ImportSnapshotSummary; label: str
 type DownloadedSnapshotResponse = ExportSnapshotResponse & {
   snapshot: SnapshotDocument
   downloaded_file_name: string
+}
+
+type PreviewSnapshotResult = {
+  response: SnapshotImportPreviewResponse
+  snapshot: SnapshotDocument
 }
 
 type UploadedImportResponse = ImportSnapshotResponse & {
@@ -91,7 +99,9 @@ function buildSnapshotFileName(response: ExportSnapshotResponse, preferredName: 
   }
 
   const userId = response.source_user_id || "spotify-account"
-  const exportedAt = response.exported_at ? response.exported_at.replace(/[:.]/g, "-") : new Date().toISOString().replace(/[:.]/g, "-")
+  const exportedAt = response.exported_at
+    ? response.exported_at.replace(/[:.]/g, "-")
+    : new Date().toISOString().replace(/[:.]/g, "-")
   return `spotify-snapshot-${userId}-${exportedAt}.json`
 }
 
@@ -145,11 +155,7 @@ async function readSnapshotDocument(file: File): Promise<SnapshotDocument> {
   return parsed as SnapshotDocument
 }
 
-function SummaryGrid({
-  items,
-}: {
-  items: Array<{ label: string; value: number }>
-}) {
+function SummaryGrid({ items }: { items: Array<{ label: string; value: number }> }) {
   return (
     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
       {items.map((item) => (
@@ -216,6 +222,28 @@ function PlaylistList({ playlists }: { playlists: ImportedPlaylistSummary[] }) {
   )
 }
 
+function DestructiveOperationList({ operations }: { operations: string[] }) {
+  if (!operations.length) {
+    return null
+  }
+
+  return (
+    <div className="rounded-3xl border border-destructive/25 bg-destructive/8 p-4">
+      <div className="mb-3 flex items-center gap-2 font-semibold text-destructive">
+        <ShieldAlert className="h-4 w-4" />
+        Destructive changes
+      </div>
+      <div className="grid gap-2 text-sm text-destructive">
+        {operations.map((operation) => (
+          <div key={operation} className="rounded-2xl border border-destructive/20 bg-white/80 px-3 py-2">
+            {operation}
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 export function TransferLibraryTool() {
   const { isAuthenticated } = useSpotifySession()
 
@@ -228,7 +256,17 @@ export function TransferLibraryTool() {
     outputFileName: "",
   })
 
+  const [exportJobId, setExportJobId] = useState<string | null>(null)
+  const [requestedExportFileName, setRequestedExportFileName] = useState("")
+  const [lastDownloadedExportJobId, setLastDownloadedExportJobId] = useState<string | null>(null)
+  const [exportResult, setExportResult] = useState<DownloadedSnapshotResponse | null>(null)
+
   const [snapshotFile, setSnapshotFile] = useState<File | null>(null)
+  const [previewedSnapshot, setPreviewedSnapshot] = useState<SnapshotDocument | null>(null)
+  const [previewData, setPreviewData] = useState<SnapshotImportPreviewResponse["preview"] | null>(null)
+  const [importConfirmationChecked, setImportConfirmationChecked] = useState(false)
+  const [importJobId, setImportJobId] = useState<string | null>(null)
+  const [importResult, setImportResult] = useState<UploadedImportResponse | null>(null)
   const [importForm, setImportForm] = useState({
     importPlaylists: true,
     importLikedTracks: true,
@@ -238,43 +276,41 @@ export function TransferLibraryTool() {
     strictLikedOrder: false,
   })
 
-  const exportSnapshotMutation = useMutation<DownloadedSnapshotResponse, Error>({
-    mutationFn: async () => {
-      const response = await exportSnapshot({
-        cutoff_date: exportForm.cutoffDate ? new Date(exportForm.cutoffDate).toISOString() : undefined,
-        include_playlists: exportForm.includePlaylists,
-        include_liked_tracks: exportForm.includeLikedTracks,
-        include_saved_albums: exportForm.includeSavedAlbums,
-        include_followed_artists: exportForm.includeFollowedArtists,
-        write_to_file: false,
-        output_file_name: exportForm.outputFileName || undefined,
-        return_snapshot: true,
-      })
-
-      if (!response.snapshot) {
-        throw new Error("The export completed, but no snapshot file was returned for download.")
-      }
-
-      const downloadedFileName = buildSnapshotFileName(response, exportForm.outputFileName)
-      downloadSnapshotFile(response.snapshot, downloadedFileName)
-
-      return {
-        ...response,
-        snapshot: response.snapshot,
-        downloaded_file_name: downloadedFileName,
-      }
+  const startExportJobMutation = useMutation({
+    mutationFn: startExportSnapshotJob,
+    onSuccess: (job) => {
+      setExportJobId(job.job_id)
     },
   })
 
-  const importSnapshotMutation = useMutation<UploadedImportResponse, Error>({
-    mutationFn: async () => {
+  const exportJobQuery = useAsyncJob<ExportSnapshotResponse>(exportJobId)
+
+  useEffect(() => {
+    if (
+      exportJobQuery.data?.status === "completed" &&
+      exportJobQuery.data.result?.snapshot &&
+      exportJobQuery.data.job_id !== lastDownloadedExportJobId
+    ) {
+      const downloadedFileName = buildSnapshotFileName(exportJobQuery.data.result, requestedExportFileName)
+      downloadSnapshotFile(exportJobQuery.data.result.snapshot, downloadedFileName)
+      setExportResult({
+        ...exportJobQuery.data.result,
+        snapshot: exportJobQuery.data.result.snapshot,
+        downloaded_file_name: downloadedFileName,
+      })
+      setLastDownloadedExportJobId(exportJobQuery.data.job_id)
+    }
+  }, [exportJobQuery.data, lastDownloadedExportJobId, requestedExportFileName])
+
+  const previewSnapshotMutation = useMutation({
+    mutationFn: async (): Promise<PreviewSnapshotResult> => {
       if (!snapshotFile) {
-        throw new Error("Choose a snapshot file before starting the import.")
+        throw new Error("Choose a snapshot file before previewing the import.")
       }
 
-      const snapshotDocument = await readSnapshotDocument(snapshotFile)
-      const response = await importSnapshot({
-        snapshot: snapshotDocument,
+      const snapshot = await readSnapshotDocument(snapshotFile)
+      const response = await previewSnapshotImport({
+        snapshot,
         import_playlists: importForm.importPlaylists,
         import_liked_tracks: importForm.importLikedTracks,
         import_saved_albums: importForm.importSavedAlbums,
@@ -283,15 +319,55 @@ export function TransferLibraryTool() {
         strict_liked_order: importForm.strictLikedOrder,
       })
 
-      return {
-        ...response,
-        imported_file_name: snapshotFile.name,
-      }
+      return { response, snapshot }
+    },
+    onSuccess: ({ response, snapshot }) => {
+      setPreviewData(response.preview)
+      setPreviewedSnapshot(snapshot)
+      setImportConfirmationChecked(false)
     },
   })
 
+  const startImportJobMutation = useMutation({
+    mutationFn: async () => {
+      if (!snapshotFile) {
+        throw new Error("Choose a snapshot file before starting the import.")
+      }
+
+      const snapshot = previewedSnapshot || (await readSnapshotDocument(snapshotFile))
+      return startImportSnapshotJob({
+        snapshot,
+        import_playlists: importForm.importPlaylists,
+        import_liked_tracks: importForm.importLikedTracks,
+        import_saved_albums: importForm.importSavedAlbums,
+        import_followed_artists: importForm.importFollowedArtists,
+        clear_existing_before_import: importForm.clearExistingBeforeImport,
+        strict_liked_order: importForm.strictLikedOrder,
+      })
+    },
+    onSuccess: (job) => {
+      setImportJobId(job.job_id)
+    },
+  })
+
+  const importJobQuery = useAsyncJob<ImportSnapshotResponse>(importJobId)
+
+  useEffect(() => {
+    if (importJobQuery.data?.status === "completed" && importJobQuery.data.result && snapshotFile) {
+      setImportResult({
+        ...importJobQuery.data.result,
+        imported_file_name: snapshotFile.name,
+      })
+    }
+  }, [importJobQuery.data, snapshotFile])
+
+  const activeExportJob = exportJobQuery.data ?? startExportJobMutation.data ?? null
+  const activeImportJob = importJobQuery.data ?? startImportJobMutation.data ?? null
+  const isExporting = isActiveJobStatus(activeExportJob?.status)
+  const isImporting = isActiveJobStatus(activeImportJob?.status)
+
   const exportSummaryItems = useMemo(() => {
-    const counts = exportSnapshotMutation.data?.counts
+    const counts = exportResult?.counts
     if (!counts) {
       return []
     }
@@ -300,10 +376,10 @@ export function TransferLibraryTool() {
       label,
       value: counts[key] ?? 0,
     }))
-  }, [exportSnapshotMutation.data])
+  }, [exportResult])
 
-  const importPrimarySummaryItems = useMemo(() => {
-    const summary = importSnapshotMutation.data?.result.summary
+  const previewPrimarySummaryItems = useMemo(() => {
+    const summary = previewData?.summary
     if (!summary) {
       return []
     }
@@ -312,290 +388,438 @@ export function TransferLibraryTool() {
       label,
       value: summary[key] ?? 0,
     }))
-  }, [importSnapshotMutation.data])
+  }, [previewData])
 
-  const importRemovalItems = useMemo(() => {
-    const summary = importSnapshotMutation.data?.result.summary
+  const previewRemovalItems = useMemo(() => {
+    const summary = previewData?.summary
     if (!summary) {
       return []
     }
 
     return removalSummaryLabels
-      .map(({ key, label }) => ({
-        label,
-        value: summary[key] ?? 0,
-      }))
+      .map(({ key, label }) => ({ label, value: summary[key] ?? 0 }))
       .filter((item) => item.value > 0)
-  }, [importSnapshotMutation.data])
+  }, [previewData])
 
   const importFailureItems = useMemo(() => {
-    const summary = importSnapshotMutation.data?.result.summary
+    const summary = importResult?.result.summary
     if (!summary) {
       return []
     }
 
     return failureSummaryLabels
-      .map(({ key, label }) => ({
-        label,
-        value: summary[key] ?? 0,
-      }))
+      .map(({ key, label }) => ({ label, value: summary[key] ?? 0 }))
       .filter((item) => item.value > 0)
-  }, [importSnapshotMutation.data])
+  }, [importResult])
+
+  const importRemovalItems = useMemo(() => {
+    const summary = importResult?.result.summary
+    if (!summary) {
+      return []
+    }
+
+    return removalSummaryLabels
+      .map(({ key, label }) => ({ label, value: summary[key] ?? 0 }))
+      .filter((item) => item.value > 0)
+  }, [importResult])
+
+  const resetImportWorkflow = () => {
+    setPreviewData(null)
+    setPreviewedSnapshot(null)
+    setImportConfirmationChecked(false)
+    setImportJobId(null)
+    setImportResult(null)
+    previewSnapshotMutation.reset()
+    startImportJobMutation.reset()
+  }
 
   const handleExportSnapshot = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    void exportSnapshotMutation.mutateAsync()
+    setExportResult(null)
+    setExportJobId(null)
+    setLastDownloadedExportJobId(null)
+    setRequestedExportFileName(exportForm.outputFileName)
+    void startExportJobMutation.mutateAsync({
+      cutoff_date: exportForm.cutoffDate ? new Date(exportForm.cutoffDate).toISOString() : undefined,
+      include_playlists: exportForm.includePlaylists,
+      include_liked_tracks: exportForm.includeLikedTracks,
+      include_saved_albums: exportForm.includeSavedAlbums,
+      include_followed_artists: exportForm.includeFollowedArtists,
+      write_to_file: false,
+      output_file_name: exportForm.outputFileName || undefined,
+      return_snapshot: true,
+    })
   }
 
   const handleImportSnapshot = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    void importSnapshotMutation.mutateAsync()
+    if (!previewData) {
+      return
+    }
+
+    void startImportJobMutation.mutateAsync()
+  }
+
+  const handlePreviewImport = async () => {
+    resetImportWorkflow()
+    await previewSnapshotMutation.mutateAsync()
   }
 
   const handleSnapshotFileChange = (event: ChangeEvent<HTMLInputElement>) => {
     const nextFile = event.target.files?.[0] || null
     setSnapshotFile(nextFile)
-    importSnapshotMutation.reset()
+    resetImportWorkflow()
   }
 
   const handleDownloadAgain = () => {
-    if (!exportSnapshotMutation.data?.snapshot) {
+    if (!exportResult?.snapshot) {
       return
     }
 
-    downloadSnapshotFile(exportSnapshotMutation.data.snapshot, exportSnapshotMutation.data.downloaded_file_name)
+    downloadSnapshotFile(exportResult.snapshot, exportResult.downloaded_file_name)
   }
 
-  return (
-    <section id="transfer-tools" className="grid gap-6 xl:grid-cols-2">
-      <Card className="animate-fade-up [animation-delay:180ms]">
-        <CardHeader>
-          <CardTitle>Download a snapshot file</CardTitle>
-          <CardDescription>
-            Choose what to include, then download a portable JSON snapshot directly in your browser.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-5">
-          {!isAuthenticated ? (
-            <AuthRequiredNotice message="Connect Spotify first to export a snapshot from the current account." />
-          ) : null}
+  const previewRequiresConfirmation = Boolean(previewData?.requires_confirmation)
+  const canStartImport = Boolean(previewData) && (!previewRequiresConfirmation || importConfirmationChecked) && !isImporting
 
-          <form className="space-y-4" onSubmit={handleExportSnapshot}>
-            <div className="space-y-2">
-              <Label htmlFor="cutoffDate">Cutoff date</Label>
-              <Input
-                id="cutoffDate"
-                type="datetime-local"
-                value={exportForm.cutoffDate}
-                onChange={(event) => setExportForm((current) => ({ ...current, cutoffDate: event.target.value }))}
-              />
-            </div>
+  const exportCard = (
+    <Card className="animate-fade-up [animation-delay:180ms]">
+      <CardHeader>
+        <CardTitle>Download a snapshot file</CardTitle>
+        <CardDescription>
+          Choose what to include, start the export in the background, and download the snapshot as soon as it is ready.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-5">
+        {!isAuthenticated ? (
+          <AuthRequiredNotice message="Connect Spotify first to export a snapshot from the current account." />
+        ) : null}
 
-            <div className="space-y-2">
-              <Label htmlFor="outputFileName">Download file name</Label>
-              <Input
-                id="outputFileName"
-                placeholder="spotify-snapshot-2026-03-25.json"
-                value={exportForm.outputFileName}
-                onChange={(event) => setExportForm((current) => ({ ...current, outputFileName: event.target.value }))}
-              />
-            </div>
-
-            <div className="grid gap-3 sm:grid-cols-2">
-              {exportToggleFields.map(({ label, key }) => (
-                <label
-                  key={key}
-                  className="flex items-center gap-3 rounded-2xl border border-border bg-white/70 px-4 py-3 text-sm"
-                >
-                  <Checkbox
-                    checked={exportForm[key]}
-                    onChange={(event) =>
-                      setExportForm((current) => ({
-                        ...current,
-                        [key]: event.target.checked,
-                      }))
-                    }
-                  />
-                  <span>{label}</span>
-                </label>
-              ))}
-            </div>
-
-            <Button className="w-full sm:w-auto" disabled={!isAuthenticated || exportSnapshotMutation.isPending} type="submit">
-              {exportSnapshotMutation.isPending ? (
-                <LoaderCircle className="h-4 w-4 animate-spin" />
-              ) : (
-                <Download className="h-4 w-4" />
-              )}
-              Download snapshot
-            </Button>
-          </form>
-
-          {exportSnapshotMutation.isError ? (
-            <p className="rounded-2xl border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-              {getErrorMessage(exportSnapshotMutation.error)}
-            </p>
-          ) : null}
-
-          {exportSnapshotMutation.data ? (
-            <div className="space-y-4 rounded-3xl border border-primary/20 bg-primary/8 p-4">
-              <div className="flex items-start gap-3">
-                <div className="mt-0.5 rounded-2xl bg-primary/12 p-2 text-primary">
-                  <CheckCircle2 className="h-5 w-5" />
-                </div>
-                <div className="min-w-0">
-                  <p className="font-semibold text-foreground">Snapshot downloaded</p>
-                  <p className="mt-1 text-sm text-muted-foreground">{exportSnapshotMutation.data.downloaded_file_name}</p>
-                </div>
-              </div>
-
-              <SummaryGrid items={exportSummaryItems} />
-
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div className="rounded-2xl border border-border bg-white/80 px-4 py-3 text-sm">
-                  <p className="font-medium text-foreground">Source account</p>
-                  <p className="mt-1 text-muted-foreground">{exportSnapshotMutation.data.source_user_id || "Unknown"}</p>
-                </div>
-                <div className="rounded-2xl border border-border bg-white/80 px-4 py-3 text-sm">
-                  <p className="font-medium text-foreground">Exported at</p>
-                  <p className="mt-1 text-muted-foreground">{formatDateTime(exportSnapshotMutation.data.exported_at)}</p>
-                </div>
-                <div className="rounded-2xl border border-border bg-white/80 px-4 py-3 text-sm sm:col-span-2">
-                  <p className="font-medium text-foreground">Cutoff date</p>
-                  <p className="mt-1 text-muted-foreground">{formatDateTime(exportSnapshotMutation.data.cutoff_date)}</p>
-                </div>
-              </div>
-
-              <div className="flex flex-wrap gap-3">
-                <Button onClick={handleDownloadAgain} variant="secondary">
-                  <Download className="h-4 w-4" />
-                  Download again
-                </Button>
-              </div>
-            </div>
-          ) : null}
-        </CardContent>
-      </Card>
-
-      <Card className="animate-fade-up [animation-delay:220ms]">
-        <CardHeader>
-          <CardTitle>Upload a snapshot file</CardTitle>
-          <CardDescription>
-            Select a previously downloaded snapshot file, choose what to apply, and import it into the connected account.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-5">
-          {!isAuthenticated ? (
-            <AuthRequiredNotice message="Connect Spotify first to apply a snapshot into the active account." />
-          ) : null}
-
-          <div className="rounded-3xl border border-border bg-muted/45 p-4">
-            <p className="text-sm font-medium text-foreground">Selected file</p>
-            <p className="mt-2 text-lg font-semibold">{snapshotFile ? snapshotFile.name : "No snapshot selected yet"}</p>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {snapshotFile
-                ? `${formatFileSize(snapshotFile.size)} - ready to import`
-                : "Choose a JSON snapshot file exported from Spotify Time Machine."}
-            </p>
+        <form className="space-y-4" onSubmit={handleExportSnapshot}>
+          <div className="space-y-2">
+            <Label htmlFor="cutoffDate">Cutoff date</Label>
+            <Input
+              id="cutoffDate"
+              type="datetime-local"
+              value={exportForm.cutoffDate}
+              onChange={(event) => setExportForm((current) => ({ ...current, cutoffDate: event.target.value }))}
+            />
           </div>
 
-          <form className="space-y-4" onSubmit={handleImportSnapshot}>
-            <div className="space-y-2">
-              <Label htmlFor="snapshotFile">Snapshot file</Label>
-              <Input
-                id="snapshotFile"
-                accept=".json,application/json"
-                onChange={handleSnapshotFileChange}
-                type="file"
-              />
+          <div className="space-y-2">
+            <Label htmlFor="outputFileName">Download file name</Label>
+            <Input
+              id="outputFileName"
+              placeholder="spotify-snapshot-2026-03-25.json"
+              value={exportForm.outputFileName}
+              onChange={(event) => setExportForm((current) => ({ ...current, outputFileName: event.target.value }))}
+            />
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            {exportToggleFields.map(({ label, key }) => (
+              <label
+                key={key}
+                className="flex items-center gap-3 rounded-2xl border border-border bg-white/70 px-4 py-3 text-sm"
+              >
+                <Checkbox
+                  checked={exportForm[key]}
+                  onChange={(event) =>
+                    setExportForm((current) => ({
+                      ...current,
+                      [key]: event.target.checked,
+                    }))
+                  }
+                />
+                <span>{label}</span>
+              </label>
+            ))}
+          </div>
+
+          <Button className="w-full sm:w-auto" disabled={!isAuthenticated || isExporting || startExportJobMutation.isPending} type="submit">
+            {isExporting ? (
+              <LoaderCircle className="h-4 w-4 animate-spin" />
+            ) : (
+              <Download className="h-4 w-4" />
+            )}
+            Start export
+          </Button>
+        </form>
+
+        <JobStatusCard
+          job={activeExportJob}
+          title="Snapshot export job"
+          idleMessage="Start an export to package playlists, liked songs, albums, and followed artists into a downloadable snapshot."
+        />
+
+        {startExportJobMutation.isError ? (
+          <p className="rounded-2xl border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+            {getErrorMessage(startExportJobMutation.error)}
+          </p>
+        ) : null}
+
+        {exportJobQuery.isError ? (
+          <p className="rounded-2xl border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+            {getErrorMessage(exportJobQuery.error)}
+          </p>
+        ) : null}
+
+        {exportResult ? (
+          <div className="space-y-4 rounded-3xl border border-primary/20 bg-primary/8 p-4">
+            <div className="flex items-start gap-3">
+              <div className="mt-0.5 rounded-2xl bg-primary/12 p-2 text-primary">
+                <CheckCircle2 className="h-5 w-5" />
+              </div>
+              <div className="min-w-0">
+                <p className="font-semibold text-foreground">Snapshot downloaded</p>
+                <p className="mt-1 text-sm text-muted-foreground">{exportResult.downloaded_file_name}</p>
+              </div>
             </div>
 
+            <SummaryGrid items={exportSummaryItems} />
+
             <div className="grid gap-3 sm:grid-cols-2">
-              {importToggleFields.map(({ label, key }) => (
-                <label
-                  key={key}
-                  className="flex items-center gap-3 rounded-2xl border border-border bg-white/70 px-4 py-3 text-sm"
-                >
-                  <Checkbox
-                    checked={importForm[key]}
-                    onChange={(event) =>
-                      setImportForm((current) => ({
-                        ...current,
-                        [key]: event.target.checked,
-                      }))
-                    }
-                  />
-                  <span>{label}</span>
-                </label>
-              ))}
+              <div className="rounded-2xl border border-border bg-white/80 px-4 py-3 text-sm">
+                <p className="font-medium text-foreground">Source account</p>
+                <p className="mt-1 text-muted-foreground">{exportResult.source_user_id || "Unknown"}</p>
+              </div>
+              <div className="rounded-2xl border border-border bg-white/80 px-4 py-3 text-sm">
+                <p className="font-medium text-foreground">Exported at</p>
+                <p className="mt-1 text-muted-foreground">{formatDateTime(exportResult.exported_at)}</p>
+              </div>
+              <div className="rounded-2xl border border-border bg-white/80 px-4 py-3 text-sm sm:col-span-2">
+                <p className="font-medium text-foreground">Cutoff date</p>
+                <p className="mt-1 text-muted-foreground">{formatDateTime(exportResult.cutoff_date)}</p>
+              </div>
             </div>
+
+            <div className="flex flex-wrap gap-3">
+              <Button onClick={handleDownloadAgain} variant="secondary">
+                <Download className="h-4 w-4" />
+                Download again
+              </Button>
+            </div>
+          </div>
+        ) : null}
+      </CardContent>
+    </Card>
+  )
+
+  const importCard = (
+    <Card className="animate-fade-up [animation-delay:220ms]">
+      <CardHeader>
+        <CardTitle>Upload a snapshot file</CardTitle>
+        <CardDescription>
+          Preview the exact import plan first, acknowledge destructive changes when needed, and then run the import in the background.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-5">
+        {!isAuthenticated ? (
+          <AuthRequiredNotice message="Connect Spotify first to apply a snapshot into the active account." />
+        ) : null}
+
+        <div className="rounded-3xl border border-border bg-muted/45 p-4">
+          <p className="text-sm font-medium text-foreground">Selected file</p>
+          <p className="mt-2 text-lg font-semibold">{snapshotFile ? snapshotFile.name : "No snapshot selected yet"}</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {snapshotFile
+              ? `${formatFileSize(snapshotFile.size)} - ready for preview`
+              : "Choose a JSON snapshot file exported from Spotify Time Machine."}
+          </p>
+        </div>
+
+        <form className="space-y-4" onSubmit={handleImportSnapshot}>
+          <div className="space-y-2">
+            <Label htmlFor="snapshotFile">Snapshot file</Label>
+            <Input id="snapshotFile" accept=".json,application/json" onChange={handleSnapshotFileChange} type="file" />
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            {importToggleFields.map(({ label, key }) => (
+              <label
+                key={key}
+                className="flex items-center gap-3 rounded-2xl border border-border bg-white/70 px-4 py-3 text-sm"
+              >
+                <Checkbox
+                  checked={importForm[key]}
+                  onChange={(event) => {
+                    setImportForm((current) => ({
+                      ...current,
+                      [key]: event.target.checked,
+                    }))
+                    resetImportWorkflow()
+                  }}
+                />
+                <span>{label}</span>
+              </label>
+            ))}
+          </div>
+
+          <div className="flex flex-wrap gap-3">
+            <Button
+              className="w-full sm:w-auto"
+              disabled={!isAuthenticated || !snapshotFile || previewSnapshotMutation.isPending || isImporting}
+              onClick={() => void handlePreviewImport()}
+              type="button"
+              variant="secondary"
+            >
+              {previewSnapshotMutation.isPending ? (
+                <LoaderCircle className="h-4 w-4 animate-spin" />
+              ) : (
+                <ShieldAlert className="h-4 w-4" />
+              )}
+              Preview import plan
+            </Button>
 
             <Button
               className="w-full sm:w-auto"
-              disabled={!isAuthenticated || !snapshotFile || importSnapshotMutation.isPending}
+              disabled={!canStartImport || !snapshotFile || startImportJobMutation.isPending}
               type="submit"
-              variant="secondary"
             >
-              {importSnapshotMutation.isPending ? (
+              {isImporting ? (
                 <LoaderCircle className="h-4 w-4 animate-spin" />
               ) : (
                 <FileUp className="h-4 w-4" />
               )}
               Import snapshot
             </Button>
-          </form>
+          </div>
+        </form>
 
-          {importSnapshotMutation.isError ? (
-            <p className="rounded-2xl border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-              {getErrorMessage(importSnapshotMutation.error)}
-            </p>
-          ) : null}
+        <JobStatusCard
+          job={activeImportJob}
+          title="Snapshot import job"
+          idleMessage="Preview the import plan first, then start the background import when you are ready."
+        />
 
-          {importSnapshotMutation.data ? (
-            <div className="space-y-4 rounded-3xl border border-primary/20 bg-primary/8 p-4">
-              <div className="flex items-start gap-3">
-                <div className="mt-0.5 rounded-2xl bg-primary/12 p-2 text-primary">
-                  <CheckCircle2 className="h-5 w-5" />
-                </div>
-                <div className="min-w-0">
-                  <p className="font-semibold text-foreground">Snapshot import completed</p>
-                  <p className="mt-1 text-sm text-muted-foreground">{importSnapshotMutation.data.imported_file_name}</p>
-                </div>
-              </div>
+        {previewSnapshotMutation.isError ? (
+          <p className="rounded-2xl border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+            {getErrorMessage(previewSnapshotMutation.error)}
+          </p>
+        ) : null}
 
-              <SummaryGrid items={importPrimarySummaryItems} />
+        {startImportJobMutation.isError ? (
+          <p className="rounded-2xl border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+            {getErrorMessage(startImportJobMutation.error)}
+          </p>
+        ) : null}
 
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div className="rounded-2xl border border-border bg-white/80 px-4 py-3 text-sm">
-                  <p className="font-medium text-foreground">Source account</p>
-                  <p className="mt-1 text-muted-foreground">{importSnapshotMutation.data.result.source_user_id || "Unknown"}</p>
-                </div>
-                <div className="rounded-2xl border border-border bg-white/80 px-4 py-3 text-sm">
-                  <p className="font-medium text-foreground">Target account</p>
-                  <p className="mt-1 text-muted-foreground">{importSnapshotMutation.data.result.target_user_id || "Unknown"}</p>
-                </div>
-              </div>
+        {importJobQuery.isError ? (
+          <p className="rounded-2xl border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+            {getErrorMessage(importJobQuery.error)}
+          </p>
+        ) : null}
 
-              {importRemovalItems.length ? (
-                <div className="space-y-3">
-                  <div className="text-sm font-semibold text-foreground">Pre-import cleanup</div>
-                  <SummaryGrid items={importRemovalItems} />
-                </div>
-              ) : null}
-
-              {importFailureItems.length ? (
-                <div className="space-y-3">
-                  <div className="text-sm font-semibold text-foreground">Items that could not be applied</div>
-                  <SummaryGrid items={importFailureItems} />
-                </div>
-              ) : null}
-
-              <WarningList warnings={importSnapshotMutation.data.result.warnings} />
-              <PlaylistList playlists={importSnapshotMutation.data.result.created_playlists} />
+        {previewData ? (
+          <div className="space-y-4 rounded-3xl border border-border bg-white/80 p-4">
+            <div className="space-y-2">
+              <p className="font-semibold text-foreground">Preview ready</p>
+              <p className="text-sm text-muted-foreground">
+                Review the target account, the planned additions, and any destructive steps before you start the import.
+              </p>
             </div>
-          ) : null}
-        </CardContent>
-      </Card>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="rounded-2xl border border-border bg-muted/45 px-4 py-3 text-sm">
+                <p className="font-medium text-foreground">Source account</p>
+                <p className="mt-1 text-muted-foreground">{previewData.source_user_id || "Unknown"}</p>
+              </div>
+              <div className="rounded-2xl border border-border bg-muted/45 px-4 py-3 text-sm">
+                <p className="font-medium text-foreground">Target account</p>
+                <p className="mt-1 text-muted-foreground">{previewData.target_user_id || "Unknown"}</p>
+              </div>
+            </div>
+
+            <SummaryGrid
+              items={exportCountLabels.map(({ key, label }) => ({
+                label: `Snapshot ${label.toLowerCase()}`,
+                value: previewData.snapshot_counts[key] ?? 0,
+              }))}
+            />
+
+            <div className="space-y-3">
+              <div className="text-sm font-semibold text-foreground">Planned additions</div>
+              <SummaryGrid items={previewPrimarySummaryItems} />
+            </div>
+
+            {previewRemovalItems.length ? (
+              <div className="space-y-3">
+                <div className="text-sm font-semibold text-foreground">Pre-import cleanup</div>
+                <SummaryGrid items={previewRemovalItems} />
+              </div>
+            ) : null}
+
+            <DestructiveOperationList operations={previewData.destructive_operations} />
+            <WarningList warnings={previewData.warnings} />
+
+            {previewRequiresConfirmation ? (
+              <label className="flex items-start gap-3 rounded-2xl border border-destructive/20 bg-destructive/8 px-4 py-3 text-sm text-foreground">
+                <Checkbox
+                  checked={importConfirmationChecked}
+                  onChange={(event) => setImportConfirmationChecked(event.target.checked)}
+                />
+                <span>I understand the selected content in the connected account will be removed before the snapshot is applied.</span>
+              </label>
+            ) : null}
+          </div>
+        ) : null}
+
+        {importResult ? (
+          <div className="space-y-4 rounded-3xl border border-primary/20 bg-primary/8 p-4">
+            <div className="flex items-start gap-3">
+              <div className="mt-0.5 rounded-2xl bg-primary/12 p-2 text-primary">
+                <CheckCircle2 className="h-5 w-5" />
+              </div>
+              <div className="min-w-0">
+                <p className="font-semibold text-foreground">Snapshot import completed</p>
+                <p className="mt-1 text-sm text-muted-foreground">{importResult.imported_file_name}</p>
+              </div>
+            </div>
+
+            <SummaryGrid
+              items={primaryImportSummaryLabels.map(({ key, label }) => ({
+                label: label.replace(" to ", " "),
+                value: importResult.result.summary[key] ?? 0,
+              }))}
+            />
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="rounded-2xl border border-border bg-white/80 px-4 py-3 text-sm">
+                <p className="font-medium text-foreground">Source account</p>
+                <p className="mt-1 text-muted-foreground">{importResult.result.source_user_id || "Unknown"}</p>
+              </div>
+              <div className="rounded-2xl border border-border bg-white/80 px-4 py-3 text-sm">
+                <p className="font-medium text-foreground">Target account</p>
+                <p className="mt-1 text-muted-foreground">{importResult.result.target_user_id || "Unknown"}</p>
+              </div>
+            </div>
+
+            {importRemovalItems.length ? (
+              <div className="space-y-3">
+                <div className="text-sm font-semibold text-foreground">Pre-import cleanup</div>
+                <SummaryGrid items={importRemovalItems} />
+              </div>
+            ) : null}
+
+            {importFailureItems.length ? (
+              <div className="space-y-3">
+                <div className="text-sm font-semibold text-foreground">Items that could not be applied</div>
+                <SummaryGrid items={importFailureItems} />
+              </div>
+            ) : null}
+
+            <WarningList warnings={importResult.result.warnings} />
+            <PlaylistList playlists={importResult.result.created_playlists} />
+          </div>
+        ) : null}
+      </CardContent>
+    </Card>
+  )
+
+  return (
+    <section id="transfer-tools" className="grid gap-6 xl:grid-cols-2">
+      {exportCard}
+      {importCard}
     </section>
   )
 }

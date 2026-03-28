@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from spotipy.exceptions import SpotifyException
 
 from ..core.auth import get_spotify_client
@@ -10,6 +10,7 @@ from ..services.account_snapshot import (
     export_account_snapshot,
     import_account_snapshot,
     load_snapshot_from_file,
+    preview_account_snapshot_import,
     write_snapshot_to_file,
 )
 
@@ -17,8 +18,8 @@ router = APIRouter(tags=["Snapshots"])
 
 
 @router.post("/export_account_snapshot", summary="Export account snapshot")
-def export_account_snapshot_endpoint(payload: ExportAccountSnapshotRequest):
-    sp = get_spotify_client()
+def export_account_snapshot_endpoint(request: Request, payload: ExportAccountSnapshotRequest):
+    sp = get_spotify_client(request)
 
     try:
         snapshot = export_account_snapshot(
@@ -61,7 +62,7 @@ def export_account_snapshot_endpoint(payload: ExportAccountSnapshotRequest):
 
 
 @router.post("/import_account_snapshot", summary="Import account snapshot")
-def import_account_snapshot_endpoint(payload: ImportAccountSnapshotRequest):
+def import_account_snapshot_endpoint(request: Request, payload: ImportAccountSnapshotRequest):
     if not payload.file_path and payload.snapshot is None:
         raise HTTPException(
             status_code=400,
@@ -84,7 +85,7 @@ def import_account_snapshot_endpoint(payload: ImportAccountSnapshotRequest):
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
 
-    sp = get_spotify_client()
+    sp = get_spotify_client(request)
     result = import_account_snapshot(
         sp=sp,
         snapshot=snapshot,
@@ -99,4 +100,46 @@ def import_account_snapshot_endpoint(payload: ImportAccountSnapshotRequest):
     return {
         "message": "Snapshot import completed",
         "result": result,
+    }
+
+
+@router.post("/preview_account_snapshot_import", summary="Preview account snapshot import")
+def preview_account_snapshot_import_endpoint(request: Request, payload: ImportAccountSnapshotRequest):
+    if not payload.file_path and payload.snapshot is None:
+        raise HTTPException(
+            status_code=400,
+            detail="Provide either 'file_path' or 'snapshot' in the request body.",
+        )
+
+    if payload.file_path and payload.snapshot is not None:
+        raise HTTPException(
+            status_code=400,
+            detail="Provide only one source: either 'file_path' or 'snapshot'.",
+        )
+
+    if payload.snapshot is not None and not isinstance(payload.snapshot, dict):
+        raise HTTPException(status_code=400, detail="'snapshot' must be a JSON object.")
+
+    try:
+        snapshot = payload.snapshot or load_snapshot_from_file(payload.file_path or "")
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+    sp = get_spotify_client(request)
+    preview = preview_account_snapshot_import(
+        sp=sp,
+        snapshot=snapshot,
+        import_playlists=payload.import_playlists,
+        import_liked_tracks=payload.import_liked_tracks,
+        import_saved_albums=payload.import_saved_albums,
+        import_followed_artists=payload.import_followed_artists,
+        clear_existing_before_import=payload.clear_existing_before_import,
+        strict_liked_order=payload.strict_liked_order,
+    )
+
+    return {
+        "message": "Snapshot import preview ready",
+        "preview": preview,
     }

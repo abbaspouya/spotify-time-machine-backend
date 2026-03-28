@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Request
 
 from ..core.auth import get_spotify_client
 from ..schemas.playlist import CreateLanguagePlaylistRequest, CreatePlaylistRequest
@@ -14,12 +14,13 @@ router = APIRouter(tags=["Playlists"])
 
 @router.get("/fetch_and_group", summary="Group liked songs by time period")
 def fetch_and_group(
+    request: Request,
     period: str = Query("monthly"),
     start_year: int | None = Query(None),
     end_year: int | None = Query(None),
     order: str = Query("asc"),
 ):
-    sp = get_spotify_client()
+    sp = get_spotify_client(request)
     songs = fetch_all_liked_songs(sp)
 
     groups = group_songs_by_period(
@@ -37,8 +38,8 @@ def fetch_and_group(
 
 
 @router.post("/create_playlist_for_group", summary="Create playlist from a time group")
-def create_playlist_for_group(payload: CreatePlaylistRequest):
-    sp = get_spotify_client()
+def create_playlist_for_group(request: Request, payload: CreatePlaylistRequest):
+    sp = get_spotify_client(request)
 
     songs = fetch_all_liked_songs(sp)
 
@@ -84,17 +85,17 @@ def create_playlist_for_group(payload: CreatePlaylistRequest):
     }
 
 
-@router.get("/group_by_language", summary="Group liked songs by detected language")
-def group_by_language():
-    sp = get_spotify_client()
+@router.get("/group_by_language", summary="Group liked songs by detected language (beta)")
+def group_by_language(request: Request):
+    sp = get_spotify_client(request)
     songs = fetch_all_liked_songs(sp)
     groups = group_songs_by_language(songs)
     return {"groups": groups}
 
 
-@router.post("/create_playlist_by_language", summary="Create playlist from a language group")
-def create_playlist_by_language(payload: CreateLanguagePlaylistRequest):
-    sp = get_spotify_client()
+@router.post("/create_playlist_by_language", summary="Create playlist from a language group (beta)")
+def create_playlist_by_language(request: Request, payload: CreateLanguagePlaylistRequest):
+    sp = get_spotify_client(request)
     songs = fetch_all_liked_songs(sp)
     groups = group_songs_by_language(songs)
 

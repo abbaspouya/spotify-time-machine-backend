@@ -7,10 +7,12 @@ import type {
   GroupFilters,
   GroupedSongsResponse,
   ImportSnapshotPayload,
+  SnapshotImportPreviewResponse,
   ImportSnapshotResponse,
   LanguageGroupsResponse,
   PlaylistMutationResponse,
   SearchArtistsResponse,
+  AsyncJob,
   WhoAmI,
 } from "@/lib/types"
 
@@ -45,6 +47,7 @@ function buildQuery(params: Record<string, string | number | undefined>) {
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${API_BASE_URL}${path}`, {
+    credentials: "include",
     ...init,
     headers: {
       "Content-Type": "application/json",
@@ -98,6 +101,18 @@ export async function getGroupedSongs(filters: GroupFilters) {
   )
 }
 
+export async function startGroupedSongsJob(filters: GroupFilters) {
+  return request<AsyncJob<GroupedSongsResponse>>("/jobs/fetch_and_group", {
+    method: "POST",
+    body: JSON.stringify({
+      period: filters.period,
+      order: filters.order,
+      start_year: filters.startYear,
+      end_year: filters.endYear,
+    }),
+  })
+}
+
 export async function createPlaylistForGroup(payload: CreatePlaylistPayload) {
   return request<PlaylistMutationResponse>("/create_playlist_for_group", {
     method: "POST",
@@ -107,6 +122,13 @@ export async function createPlaylistForGroup(payload: CreatePlaylistPayload) {
 
 export async function getLanguageGroups() {
   return request<LanguageGroupsResponse>("/group_by_language")
+}
+
+export async function startLanguageGroupsJob() {
+  return request<AsyncJob<LanguageGroupsResponse>>("/jobs/group_by_language", {
+    method: "POST",
+    body: JSON.stringify({}),
+  })
 }
 
 export async function createPlaylistByLanguage(payload: CreateLanguagePlaylistPayload) {
@@ -132,9 +154,34 @@ export async function exportSnapshot(payload: ExportSnapshotPayload) {
   })
 }
 
+export async function startExportSnapshotJob(payload: ExportSnapshotPayload) {
+  return request<AsyncJob<ExportSnapshotResponse>>("/jobs/export_account_snapshot", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  })
+}
+
 export async function importSnapshot(payload: ImportSnapshotPayload) {
   return request<ImportSnapshotResponse>("/import_account_snapshot", {
     method: "POST",
     body: JSON.stringify(payload),
   })
+}
+
+export async function previewSnapshotImport(payload: ImportSnapshotPayload) {
+  return request<SnapshotImportPreviewResponse>("/preview_account_snapshot_import", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  })
+}
+
+export async function startImportSnapshotJob(payload: ImportSnapshotPayload) {
+  return request<AsyncJob<ImportSnapshotResponse>>("/jobs/import_account_snapshot", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  })
+}
+
+export async function getJob<T>(jobId: string) {
+  return request<AsyncJob<T>>(`/jobs/${jobId}`)
 }

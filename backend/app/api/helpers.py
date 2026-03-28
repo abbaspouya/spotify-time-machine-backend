@@ -1,6 +1,8 @@
 from urllib.parse import urlencode
 
-from ..core.auth import get_oauth
+from fastapi import Request
+
+from ..core.auth import get_token_info_for_request
 from ..core.config import FRONTEND_AUTH_CALLBACK_PATH, FRONTEND_URL
 
 
@@ -12,8 +14,8 @@ def build_frontend_redirect(status: str, detail: str | None = None) -> str:
     return f"{target}?{urlencode(params)}"
 
 
-def build_auth_status_response() -> dict[str, object]:
-    token = get_oauth().get_cached_token()
+def build_auth_status_response(request: Request) -> dict[str, object]:
+    token = get_token_info_for_request(request)
     if not token:
         return {"authenticated": False}
 

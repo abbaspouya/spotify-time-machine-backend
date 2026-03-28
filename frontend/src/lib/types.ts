@@ -113,6 +113,15 @@ export type ImportSnapshotPayload = {
   strict_liked_order: boolean
 }
 
+export type SnapshotImportRequestedActions = {
+  import_playlists: boolean
+  import_liked_tracks: boolean
+  import_saved_albums: boolean
+  import_followed_artists: boolean
+  clear_existing_before_import: boolean
+  strict_liked_order: boolean
+}
+
 export type ImportSnapshotSummary = {
   playlists_created: number
   playlist_tracks_added: number
@@ -147,4 +156,36 @@ export type ImportSnapshotResult = {
 export type ImportSnapshotResponse = {
   message: string
   result: ImportSnapshotResult
+}
+
+export type SnapshotImportPreview = {
+  previewed_at: string
+  target_user_id: string | null
+  source_user_id: string | null
+  snapshot_counts: SnapshotCounts
+  summary: ImportSnapshotSummary
+  requested_actions: SnapshotImportRequestedActions
+  destructive_operations: string[]
+  warnings: string[]
+  requires_confirmation: boolean
+}
+
+export type SnapshotImportPreviewResponse = {
+  message: string
+  preview: SnapshotImportPreview
+}
+
+export type AsyncJobStatus = "queued" | "running" | "completed" | "failed"
+
+export type AsyncJob<T = unknown> = {
+  job_id: string
+  kind: string
+  status: AsyncJobStatus
+  progress: number | null
+  message: string | null
+  error: string | null
+  created_at: string
+  updated_at: string
+  finished_at: string | null
+  result: T | null
 }

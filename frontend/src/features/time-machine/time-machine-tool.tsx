@@ -1,12 +1,14 @@
 import { useEffect, useState } from "react"
 import type { FormEvent } from "react"
 import { Download, ExternalLink, LoaderCircle, Music4 } from "lucide-react"
-import { useMutation, useQuery } from "@tanstack/react-query"
+import { useMutation } from "@tanstack/react-query"
 
-import { createPlaylistForGroup, getGroupedSongs } from "@/lib/api"
-import type { GroupFilters } from "@/lib/types"
+import { createPlaylistForGroup, startGroupedSongsJob } from "@/lib/api"
+import type { GroupFilters, GroupedSongsResponse } from "@/lib/types"
 import { AuthRequiredNotice } from "@/features/spotify/auth-required-notice"
 import { getErrorMessage, useSpotifySession } from "@/features/spotify/use-spotify-session"
+import { JobStatusCard } from "@/features/jobs/job-status-card"
+import { isActiveJobStatus, useAsyncJob } from "@/features/jobs/use-async-job"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -58,24 +60,35 @@ export function TimeMachineTool() {
   const [selectedGroup, setSelectedGroup] = useState("")
   const [groupPlaylistName, setGroupPlaylistName] = useState("")
   const [groupPlaylistDescription, setGroupPlaylistDescription] = useState("")
+  const [groupJobId, setGroupJobId] = useState<string | null>(null)
+  const [groupedResult, setGroupedResult] = useState<GroupedSongsResponse | null>(null)
 
-  const groupedQuery = useQuery({
-    queryKey: ["groupedSongs", appliedGroupFilters],
-    queryFn: () => getGroupedSongs(appliedGroupFilters),
-    enabled: isAuthenticated,
+  const startGroupedJobMutation = useMutation({
+    mutationFn: startGroupedSongsJob,
+    onSuccess: (job) => {
+      setGroupJobId(job.job_id)
+    },
   })
 
+  const groupedJobQuery = useAsyncJob<GroupedSongsResponse>(groupJobId)
+
   useEffect(() => {
-    const groups = Object.keys(groupedQuery.data?.groups ?? {})
+    if (groupedJobQuery.data?.status === "completed" && groupedJobQuery.data.result) {
+      setGroupedResult(groupedJobQuery.data.result)
+    }
+  }, [groupedJobQuery.data])
+
+  useEffect(() => {
+    const groups = Object.keys(groupedResult?.groups ?? {})
     if (!groups.length) {
       setSelectedGroup("")
       return
     }
 
-    if (!selectedGroup || !(selectedGroup in (groupedQuery.data?.groups ?? {}))) {
+    if (!selectedGroup || !(selectedGroup in (groupedResult?.groups ?? {}))) {
       setSelectedGroup(groups[0])
     }
-  }, [groupedQuery.data, selectedGroup])
+  }, [groupedResult, selectedGroup])
 
   const groupedPlaylistMutation = useMutation({
     mutationFn: () =>
@@ -90,15 +103,26 @@ export function TimeMachineTool() {
       }),
   })
 
+  const activeGroupedJob = groupedJobQuery.data ?? startGroupedJobMutation.data ?? null
+  const isGrouping = isActiveJobStatus(activeGroupedJob?.status)
+  const groupedEntries = Object.entries(groupedResult?.groups ?? {})
+
   const handleApplyGroupFilters = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
 
-    setAppliedGroupFilters({
+    const nextFilters = {
       period: groupDraft.period,
       order: groupDraft.order,
       startYear: groupDraft.startYear ? Number(groupDraft.startYear) : undefined,
       endYear: groupDraft.endYear ? Number(groupDraft.endYear) : undefined,
-    })
+    }
+
+    setAppliedGroupFilters(nextFilters)
+    setGroupedResult(null)
+    setSelectedGroup("")
+    setGroupJobId(null)
+    groupedPlaylistMutation.reset()
+    void startGroupedJobMutation.mutateAsync(nextFilters)
   }
 
   const handleCreateGroupedPlaylist = (event: FormEvent<HTMLFormElement>) => {
@@ -106,16 +130,14 @@ export function TimeMachineTool() {
     void groupedPlaylistMutation.mutateAsync()
   }
 
-  const groupedEntries = Object.entries(groupedQuery.data?.groups ?? {})
-
   return (
     <section id="time-machine-tool" className="grid gap-6 xl:grid-cols-[1fr_1.1fr]">
       <Card className="animate-fade-up [animation-delay:180ms]">
         <CardHeader>
           <CardTitle>Build time-based groups</CardTitle>
           <CardDescription>
-            Filter your liked library, inspect the generated buckets, and choose the time slice you want to turn into a
-            playlist.
+            Filter your liked library, start a background grouping job, and then choose the time slice you want to turn
+            into a playlist.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-5">
@@ -171,7 +193,7 @@ export function TimeMachineTool() {
             </div>
 
             <div className="md:col-span-2">
-              <Button className="w-full sm:w-auto" disabled={!isAuthenticated} type="submit">
+              <Button className="w-full sm:w-auto" disabled={!isAuthenticated || isGrouping || startGroupedJobMutation.isPending} type="submit">
                 <Music4 className="h-4 w-4" />
                 Load grouped songs
               </Button>
@@ -182,25 +204,30 @@ export function TimeMachineTool() {
             <AuthRequiredNotice message="Connect Spotify first to load your liked songs." />
           ) : null}
 
-          {groupedQuery.isLoading ? (
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <LoaderCircle className="h-4 w-4 animate-spin" />
-              Loading grouped library...
-            </div>
-          ) : null}
+          <JobStatusCard
+            job={activeGroupedJob}
+            title="Grouping job"
+            idleMessage="Choose filters and load grouped songs to build fresh time slices from your liked library."
+          />
 
-          {groupedQuery.isError ? (
+          {startGroupedJobMutation.isError ? (
             <p className="rounded-2xl border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-              {getErrorMessage(groupedQuery.error)}
+              {getErrorMessage(startGroupedJobMutation.error)}
             </p>
           ) : null}
 
-          {groupedQuery.data ? (
+          {groupedJobQuery.isError ? (
+            <p className="rounded-2xl border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+              {getErrorMessage(groupedJobQuery.error)}
+            </p>
+          ) : null}
+
+          {groupedResult ? (
             <div className="rounded-3xl border border-border bg-white/70 p-4">
-              <div className="mb-3 flex items-center justify-between">
+              <div className="mb-3 flex items-center justify-between gap-3">
                 <p className="text-sm font-medium text-foreground">Generated groups</p>
                 <span className="text-sm text-muted-foreground">
-                  {groupedEntries.length} groups - {groupedQuery.data.total_songs} total liked songs
+                  {groupedEntries.length} groups - {groupedResult.total_songs} total liked songs
                 </span>
               </div>
 
@@ -247,8 +274,8 @@ export function TimeMachineTool() {
             <p className="text-sm font-medium text-foreground">Current target</p>
             <p className="mt-2 text-lg font-semibold">{selectedGroup || "No group selected yet"}</p>
             <p className="mt-1 text-sm text-muted-foreground">
-              {selectedGroup && groupedQuery.data?.groups[selectedGroup]
-                ? groupCardLabel(selectedGroup, groupedQuery.data.groups[selectedGroup])
+              {selectedGroup && groupedResult?.groups[selectedGroup]
+                ? groupCardLabel(selectedGroup, groupedResult.groups[selectedGroup])
                 : "Load groups and pick one from the list on the left."}
             </p>
           </div>
@@ -274,7 +301,7 @@ export function TimeMachineTool() {
             </div>
             <Button
               className="w-full sm:w-auto"
-              disabled={!selectedGroup || groupedPlaylistMutation.isPending}
+              disabled={!selectedGroup || groupedPlaylistMutation.isPending || isGrouping}
               type="submit"
             >
               {groupedPlaylistMutation.isPending ? (

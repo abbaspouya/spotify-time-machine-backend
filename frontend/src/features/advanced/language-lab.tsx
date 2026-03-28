@@ -1,10 +1,13 @@
 import { useEffect, useState } from "react"
 import type { FormEvent } from "react"
 import { Download, Languages, ExternalLink, LoaderCircle } from "lucide-react"
-import { useMutation, useQuery } from "@tanstack/react-query"
+import { useMutation } from "@tanstack/react-query"
 
-import { createPlaylistByLanguage, getLanguageGroups } from "@/lib/api"
+import { createPlaylistByLanguage, startLanguageGroupsJob } from "@/lib/api"
+import type { LanguageGroupsResponse } from "@/lib/types"
 import { AuthRequiredNotice } from "@/features/spotify/auth-required-notice"
+import { JobStatusCard } from "@/features/jobs/job-status-card"
+import { isActiveJobStatus, useAsyncJob } from "@/features/jobs/use-async-job"
 import { getErrorMessage, useSpotifySession } from "@/features/spotify/use-spotify-session"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -18,24 +21,35 @@ export function LanguageLab() {
   const [selectedLanguage, setSelectedLanguage] = useState("")
   const [languagePlaylistName, setLanguagePlaylistName] = useState("")
   const [languageMinSongs, setLanguageMinSongs] = useState("5")
+  const [languageJobId, setLanguageJobId] = useState<string | null>(null)
+  const [languageGroupsResult, setLanguageGroupsResult] = useState<LanguageGroupsResponse | null>(null)
 
-  const languageGroupsQuery = useQuery({
-    queryKey: ["languageGroups"],
-    queryFn: getLanguageGroups,
-    enabled: false,
+  const startLanguageJobMutation = useMutation({
+    mutationFn: startLanguageGroupsJob,
+    onSuccess: (job) => {
+      setLanguageJobId(job.job_id)
+    },
   })
 
+  const languageGroupsJobQuery = useAsyncJob<LanguageGroupsResponse>(languageJobId)
+
   useEffect(() => {
-    const languages = Object.keys(languageGroupsQuery.data?.groups ?? {})
+    if (languageGroupsJobQuery.data?.status === "completed" && languageGroupsJobQuery.data.result) {
+      setLanguageGroupsResult(languageGroupsJobQuery.data.result)
+    }
+  }, [languageGroupsJobQuery.data])
+
+  useEffect(() => {
+    const languages = Object.keys(languageGroupsResult?.groups ?? {})
     if (!languages.length) {
       setSelectedLanguage("")
       return
     }
 
-    if (!selectedLanguage || !(selectedLanguage in (languageGroupsQuery.data?.groups ?? {}))) {
+    if (!selectedLanguage || !(selectedLanguage in (languageGroupsResult?.groups ?? {}))) {
       setSelectedLanguage(languages[0])
     }
-  }, [languageGroupsQuery.data, selectedLanguage])
+  }, [languageGroupsResult, selectedLanguage])
 
   const languagePlaylistMutation = useMutation({
     mutationFn: () =>
@@ -46,33 +60,46 @@ export function LanguageLab() {
       }),
   })
 
+  const activeLanguageJob = languageGroupsJobQuery.data ?? startLanguageJobMutation.data ?? null
+  const isLoadingLanguages = isActiveJobStatus(activeLanguageJob?.status)
+  const languageEntries = Object.entries(languageGroupsResult?.groups ?? {}).sort((left, right) => {
+    return right[1].length - left[1].length
+  })
+
   const handleCreateLanguagePlaylist = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     void languagePlaylistMutation.mutateAsync()
   }
 
-  const languageEntries = Object.entries(languageGroupsQuery.data?.groups ?? {}).sort((left, right) => {
-    return right[1].length - left[1].length
-  })
+  const handleLoadLanguages = () => {
+    setLanguageGroupsResult(null)
+    setSelectedLanguage("")
+    setLanguageJobId(null)
+    languagePlaylistMutation.reset()
+    void startLanguageJobMutation.mutateAsync()
+  }
 
   return (
     <section id="language-lab" className="grid gap-6 xl:grid-cols-[1fr_1.1fr]">
       <Card className="animate-fade-up [animation-delay:180ms]">
         <CardHeader>
-          <CardTitle>Language-based playlist builder</CardTitle>
+          <div className="flex flex-wrap items-center gap-2">
+            <CardTitle>Language-based playlist builder</CardTitle>
+            <Badge variant="outline">Beta</Badge>
+          </div>
           <CardDescription>
             Detect likely languages from track and artist names, then inspect the grouped results before creating a
-            playlist.
+            playlist. Treat the suggestions as a helpful starting point, not a guaranteed classification.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-5">
           <Button
             className="w-full sm:w-auto"
-            disabled={!isAuthenticated || languageGroupsQuery.isFetching}
-            onClick={() => void languageGroupsQuery.refetch()}
+            disabled={!isAuthenticated || isLoadingLanguages || startLanguageJobMutation.isPending}
+            onClick={handleLoadLanguages}
             variant="secondary"
           >
-            {languageGroupsQuery.isFetching ? (
+            {isLoadingLanguages ? (
               <LoaderCircle className="h-4 w-4 animate-spin" />
             ) : (
               <Languages className="h-4 w-4" />
@@ -84,9 +111,21 @@ export function LanguageLab() {
             <AuthRequiredNotice message="Connect Spotify first to inspect language group suggestions." />
           ) : null}
 
-          {languageGroupsQuery.isError ? (
+          <JobStatusCard
+            job={activeLanguageJob}
+            title="Language grouping job"
+            idleMessage="Run the beta language scan when you want a creative, approximate grouping of your liked songs."
+          />
+
+          {startLanguageJobMutation.isError ? (
             <p className="rounded-2xl border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-              {getErrorMessage(languageGroupsQuery.error)}
+              {getErrorMessage(startLanguageJobMutation.error)}
+            </p>
+          ) : null}
+
+          {languageGroupsJobQuery.isError ? (
+            <p className="rounded-2xl border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+              {getErrorMessage(languageGroupsJobQuery.error)}
             </p>
           ) : null}
 
@@ -117,11 +156,7 @@ export function LanguageLab() {
                 )
               })}
             </div>
-          ) : (
-            <p className="rounded-2xl border border-border bg-muted/45 px-4 py-3 text-sm text-muted-foreground">
-              Load language groups to inspect the current results.
-            </p>
-          )}
+          ) : null}
         </CardContent>
       </Card>
 
@@ -136,6 +171,9 @@ export function LanguageLab() {
           <div className="rounded-3xl border border-border bg-muted/45 p-4">
             <p className="text-sm font-medium text-foreground">Current language</p>
             <p className="mt-2 text-lg font-semibold uppercase">{selectedLanguage || "No language selected yet"}</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Beta suggestions are based on track and artist naming, so double-check the selection before creating a playlist.
+            </p>
           </div>
 
           <form className="grid gap-4 md:grid-cols-2" onSubmit={handleCreateLanguagePlaylist}>
@@ -161,7 +199,7 @@ export function LanguageLab() {
             </div>
 
             <div className="flex items-end">
-              <Button className="w-full" disabled={!selectedLanguage || languagePlaylistMutation.isPending} type="submit">
+              <Button className="w-full" disabled={!selectedLanguage || languagePlaylistMutation.isPending || isLoadingLanguages} type="submit">
                 {languagePlaylistMutation.isPending ? (
                   <LoaderCircle className="h-4 w-4 animate-spin" />
                 ) : (

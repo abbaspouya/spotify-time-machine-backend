@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -12,6 +13,7 @@ import spotipy
 BACKEND_DIR = Path(__file__).resolve().parents[2]
 PROJECT_ROOT = BACKEND_DIR.parent
 EXPORT_DIR = BACKEND_DIR / "exports"
+ProgressCallback = Callable[[int | None, str], None]
 
 
 def _parse_iso_datetime(value: str) -> datetime:
@@ -105,6 +107,60 @@ def _dedupe_preserve_order(items: list[str]) -> list[str]:
             seen.add(item)
             out.append(item)
     return out
+
+
+def _report_progress(callback: ProgressCallback | None, progress: int | None, message: str) -> None:
+    if callback is None:
+        return
+
+    callback(progress, message)
+
+
+def _build_empty_import_summary() -> dict[str, int]:
+    return {
+        "playlists_created": 0,
+        "playlist_tracks_added": 0,
+        "playlist_tracks_failed": 0,
+        "playlists_removed": 0,
+        "liked_tracks_added": 0,
+        "liked_tracks_failed": 0,
+        "liked_tracks_removed": 0,
+        "saved_albums_added": 0,
+        "saved_albums_failed": 0,
+        "saved_albums_removed": 0,
+        "followed_artists_added": 0,
+        "followed_artists_failed": 0,
+        "followed_artists_removed": 0,
+    }
+
+
+def summarize_snapshot(snapshot: dict[str, Any]) -> dict[str, int]:
+    playlists = snapshot.get("playlists", [])
+    liked_tracks = snapshot.get("liked_tracks", [])
+    saved_albums = snapshot.get("saved_albums", [])
+    followed_artists = snapshot.get("followed_artists", [])
+
+    playlist_count = len(playlists) if isinstance(playlists, list) else 0
+    liked_count = len(liked_tracks) if isinstance(liked_tracks, list) else 0
+    album_count = len(saved_albums) if isinstance(saved_albums, list) else 0
+    artist_count = len(followed_artists) if isinstance(followed_artists, list) else 0
+
+    playlist_track_count = 0
+    if isinstance(playlists, list):
+        for playlist in playlists:
+            if not isinstance(playlist, dict):
+                continue
+            tracks = playlist.get("tracks", [])
+            if isinstance(tracks, list):
+                playlist_track_count += len(tracks)
+
+    return {
+        "playlists": playlist_count,
+        "playlist_tracks": playlist_track_count,
+        "liked_tracks": liked_count,
+        "saved_albums": album_count,
+        "followed_artists": artist_count,
+    }
 
 
 def _collect_saved_track_ids(sp: spotipy.Spotify) -> list[str]:
@@ -210,7 +266,9 @@ def export_account_snapshot(
     include_liked_tracks: bool = True,
     include_saved_albums: bool = True,
     include_followed_artists: bool = True,
+    progress_callback: ProgressCallback | None = None,
 ) -> dict[str, Any]:
+    _report_progress(progress_callback, 5, "Preparing snapshot export")
     cutoff_dt = _parse_iso_datetime(cutoff_date) if cutoff_date else None
     now_utc = datetime.now(timezone.utc)
     me = sp.current_user()
@@ -237,6 +295,7 @@ def export_account_snapshot(
     }
 
     if include_playlists:
+        _report_progress(progress_callback, 15, "Exporting playlists")
         offset = 0
         while True:
             page = sp.current_user_playlists(limit=50, offset=offset)
@@ -301,6 +360,7 @@ def export_account_snapshot(
         snapshot["counts"]["playlist_tracks"] = sum(len(p["tracks"]) for p in snapshot["playlists"])
 
     if include_liked_tracks:
+        _report_progress(progress_callback, 45, "Exporting liked songs")
         offset = 0
         while True:
             page = sp.current_user_saved_tracks(limit=50, offset=offset)
@@ -336,6 +396,7 @@ def export_account_snapshot(
         snapshot["counts"]["liked_tracks"] = len(snapshot["liked_tracks"])
 
     if include_saved_albums:
+        _report_progress(progress_callback, 70, "Exporting saved albums")
         offset = 0
         while True:
             page = sp.current_user_saved_albums(limit=50, offset=offset)
@@ -371,6 +432,7 @@ def export_account_snapshot(
         snapshot["counts"]["saved_albums"] = len(snapshot["saved_albums"])
 
     if include_followed_artists:
+        _report_progress(progress_callback, 85, "Exporting followed artists")
         after: str | None = None
         while True:
             page = sp.current_user_followed_artists(limit=50, after=after)
@@ -397,6 +459,7 @@ def export_account_snapshot(
 
         snapshot["counts"]["followed_artists"] = len(snapshot["followed_artists"])
 
+    _report_progress(progress_callback, 100, "Snapshot export ready")
     return snapshot
 
 
@@ -453,7 +516,9 @@ def import_account_snapshot(
     import_followed_artists: bool = True,
     clear_existing_before_import: bool = False,
     strict_liked_order: bool = False,
+    progress_callback: ProgressCallback | None = None,
 ) -> dict[str, Any]:
+    _report_progress(progress_callback, 5, "Preparing snapshot import")
     me = sp.current_user()
     user_id = me.get("id")
 
@@ -461,26 +526,13 @@ def import_account_snapshot(
         "imported_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
         "target_user_id": user_id,
         "source_user_id": snapshot.get("source_user_id"),
-        "summary": {
-            "playlists_created": 0,
-            "playlist_tracks_added": 0,
-            "playlist_tracks_failed": 0,
-            "playlists_removed": 0,
-            "liked_tracks_added": 0,
-            "liked_tracks_failed": 0,
-            "liked_tracks_removed": 0,
-            "saved_albums_added": 0,
-            "saved_albums_failed": 0,
-            "saved_albums_removed": 0,
-            "followed_artists_added": 0,
-            "followed_artists_failed": 0,
-            "followed_artists_removed": 0,
-        },
+        "summary": _build_empty_import_summary(),
         "created_playlists": [],
         "warnings": [],
     }
 
     if clear_existing_before_import:
+        _report_progress(progress_callback, 15, "Clearing selected content before import")
         if import_playlists:
             if isinstance(user_id, str) and user_id:
                 owned_playlist_ids = _collect_owned_playlist_ids(sp, user_id)
@@ -546,6 +598,7 @@ def import_account_snapshot(
                             )
 
     if import_playlists:
+        _report_progress(progress_callback, 35, "Recreating playlists from the snapshot")
         playlists = snapshot.get("playlists", [])
         if isinstance(playlists, list):
             playlists = _order_entries_by_position(playlists)
@@ -611,6 +664,7 @@ def import_account_snapshot(
                                 result["summary"]["playlist_tracks_failed"] += 1
 
     if import_liked_tracks:
+        _report_progress(progress_callback, 65, "Restoring liked songs")
         liked_entries = snapshot.get("liked_tracks", [])
         if isinstance(liked_entries, list):
             ordered_liked_entries = _order_entries_by_position(liked_entries)
@@ -645,6 +699,7 @@ def import_account_snapshot(
                                 result["summary"]["liked_tracks_failed"] += 1
 
     if import_saved_albums:
+        _report_progress(progress_callback, 82, "Restoring saved albums")
         album_entries = snapshot.get("saved_albums", [])
         if isinstance(album_entries, list):
             ordered_album_entries = _order_entries_by_position(album_entries)
@@ -667,6 +722,7 @@ def import_account_snapshot(
                             result["summary"]["saved_albums_failed"] += 1
 
     if import_followed_artists:
+        _report_progress(progress_callback, 92, "Restoring followed artists")
         artist_entries = snapshot.get("followed_artists", [])
         if isinstance(artist_entries, list):
             artist_ids: list[str] = []
@@ -695,4 +751,131 @@ def import_account_snapshot(
                         except Exception:
                             result["summary"]["followed_artists_failed"] += 1
 
+    _report_progress(progress_callback, 100, "Snapshot import completed")
     return result
+
+
+def preview_account_snapshot_import(
+    sp: spotipy.Spotify,
+    snapshot: dict[str, Any],
+    import_playlists: bool = True,
+    import_liked_tracks: bool = True,
+    import_saved_albums: bool = True,
+    import_followed_artists: bool = True,
+    clear_existing_before_import: bool = False,
+    strict_liked_order: bool = False,
+) -> dict[str, Any]:
+    me = sp.current_user()
+    user_id = me.get("id")
+
+    warnings: list[str] = []
+    destructive_operations: list[str] = []
+    summary = _build_empty_import_summary()
+    snapshot_counts = summarize_snapshot(snapshot)
+
+    if snapshot.get("source_user_id") == user_id and user_id:
+        warnings.append(
+            "The snapshot was exported from the same Spotify account that is currently connected."
+        )
+
+    if not any([import_playlists, import_liked_tracks, import_saved_albums, import_followed_artists]):
+        warnings.append("No import options are selected, so nothing will be applied.")
+
+    if import_playlists:
+        playlists = snapshot.get("playlists", [])
+        if isinstance(playlists, list):
+            valid_playlists = [playlist for playlist in playlists if isinstance(playlist, dict)]
+            summary["playlists_created"] = len(valid_playlists)
+            summary["playlist_tracks_added"] = sum(
+                len(_normalize_uri_entries(_order_entries_by_position(playlist.get("tracks", []))))
+                for playlist in valid_playlists
+                if isinstance(playlist.get("tracks", []), list)
+            )
+            if len(valid_playlists) > 1:
+                warnings.append(
+                    "Spotify cannot preserve custom sidebar playlist ordering, so imported playlist order may differ."
+                )
+
+    if import_liked_tracks:
+        liked_entries = snapshot.get("liked_tracks", [])
+        if isinstance(liked_entries, list):
+            ordered_liked_entries = _order_entries_by_position(liked_entries)
+            liked_uris = _normalize_uri_entries(ordered_liked_entries)
+            liked_ids = _dedupe_preserve_order([_uri_to_id(uri) for uri in liked_uris if uri])
+            summary["liked_tracks_added"] = len(liked_ids)
+            if strict_liked_order and liked_ids:
+                warnings.append(
+                    "Strict liked order will import liked songs one by one, which is slower but better for visible ordering."
+                )
+
+    if import_saved_albums:
+        album_entries = snapshot.get("saved_albums", [])
+        if isinstance(album_entries, list):
+            ordered_album_entries = _order_entries_by_position(album_entries)
+            album_uris = _normalize_uri_entries(ordered_album_entries)
+            album_ids = _dedupe_preserve_order([_uri_to_id(uri) for uri in album_uris if uri])
+            summary["saved_albums_added"] = len(album_ids)
+
+    if import_followed_artists:
+        artist_entries = snapshot.get("followed_artists", [])
+        if isinstance(artist_entries, list):
+            artist_ids: list[str] = []
+            for entry in artist_entries:
+                if isinstance(entry, dict):
+                    artist_id = entry.get("id")
+                    artist_uri = entry.get("uri")
+                    if isinstance(artist_id, str) and artist_id:
+                        artist_ids.append(artist_id)
+                    elif isinstance(artist_uri, str) and artist_uri:
+                        artist_ids.append(_uri_to_id(artist_uri))
+                elif isinstance(entry, str) and entry:
+                    artist_ids.append(_uri_to_id(entry))
+
+            summary["followed_artists_added"] = len(_dedupe_preserve_order(artist_ids))
+
+    if clear_existing_before_import:
+        warnings.append("Selected areas of the target account will be cleared before the snapshot is applied.")
+
+        if import_playlists:
+            if isinstance(user_id, str) and user_id:
+                summary["playlists_removed"] = len(_collect_owned_playlist_ids(sp, user_id))
+            destructive_operations.append(
+                f"Remove {summary['playlists_removed']} existing playlists from the connected account."
+            )
+
+        if import_liked_tracks:
+            summary["liked_tracks_removed"] = len(_collect_saved_track_ids(sp))
+            destructive_operations.append(
+                f"Remove {summary['liked_tracks_removed']} currently liked songs before restoring the snapshot."
+            )
+
+        if import_saved_albums:
+            summary["saved_albums_removed"] = len(_collect_saved_album_ids(sp))
+            destructive_operations.append(
+                f"Remove {summary['saved_albums_removed']} currently saved albums before restoring the snapshot."
+            )
+
+        if import_followed_artists:
+            summary["followed_artists_removed"] = len(_collect_followed_artist_ids(sp))
+            destructive_operations.append(
+                f"Unfollow {summary['followed_artists_removed']} currently followed artists before restoring the snapshot."
+            )
+
+    return {
+        "previewed_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+        "source_user_id": snapshot.get("source_user_id"),
+        "target_user_id": user_id,
+        "snapshot_counts": snapshot_counts,
+        "summary": summary,
+        "requested_actions": {
+            "import_playlists": import_playlists,
+            "import_liked_tracks": import_liked_tracks,
+            "import_saved_albums": import_saved_albums,
+            "import_followed_artists": import_followed_artists,
+            "clear_existing_before_import": clear_existing_before_import,
+            "strict_liked_order": strict_liked_order,
+        },
+        "destructive_operations": destructive_operations,
+        "warnings": warnings,
+        "requires_confirmation": clear_existing_before_import,
+    }

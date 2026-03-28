@@ -55,7 +55,7 @@ export function ConnectPage() {
             </div>
             <CardTitle>Connection status</CardTitle>
             <CardDescription>
-              Keep your current Spotify connection visible, refresh it when needed, and confirm which account is active.
+              Keep your current Spotify connection visible, refresh it when needed, and confirm which account is active in this browser session.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">

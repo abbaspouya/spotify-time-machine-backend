@@ -19,4 +19,8 @@ API_TAGS = [
         "name": "Snapshots",
         "description": "Export and import Spotify account snapshots.",
     },
+    {
+        "name": "Jobs",
+        "description": "Async job creation and polling for long-running operations.",
+    },
 ]
