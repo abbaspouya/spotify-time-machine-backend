@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 
 const transferSteps = [
   "Export playlists, liked songs, saved albums, and followed artists.",
-  "Review what is about to be transferred before applying it.",
+  "Choose exactly which parts of the snapshot you want to apply.",
   "Import the snapshot into the target account with safer guidance.",
 ]
 
@@ -25,8 +25,8 @@ export function TransferLibraryPage() {
           <div className="mt-6 space-y-4">
             <h1 className="max-w-3xl text-4xl leading-tight md:text-5xl">Move a Spotify library with more confidence and less manual work.</h1>
             <p className="max-w-2xl text-base text-muted-foreground md:text-lg">
-              This route will become the dedicated home for snapshot export and import, safety warnings, and eventually
-              upload/download-driven transfer flows instead of backend file paths.
+              Download a snapshot from one account, upload it into another, and keep the transfer steps easier to
+              follow from start to finish.
             </p>
           </div>
 
@@ -46,7 +46,7 @@ export function TransferLibraryPage() {
               <ArrowRightLeft className="h-6 w-6" />
             </div>
             <CardTitle>What belongs here</CardTitle>
-            <CardDescription>The working export and import flow now lives here instead of being buried in a mixed dashboard.</CardDescription>
+            <CardDescription>Snapshot download, upload, and transfer feedback are all kept together in one place.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             {transferSteps.map((step) => (
@@ -61,8 +61,8 @@ export function TransferLibraryPage() {
       <section className="grid gap-6 md:grid-cols-[1fr_1fr]">
         <Card className="animate-fade-up [animation-delay:180ms]">
           <CardHeader>
-            <CardTitle>Related routes</CardTitle>
-            <CardDescription>Use the dedicated product routes around this one now that the snapshot tools are here.</CardDescription>
+            <CardTitle>Related pages</CardTitle>
+            <CardDescription>Jump to connection or advanced tools when you need them, then come right back to the transfer flow.</CardDescription>
           </CardHeader>
           <CardContent className="flex flex-wrap gap-3">
             <Link to="/connect" className={buttonVariants({ variant: "secondary" })}>

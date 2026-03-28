@@ -10,7 +10,7 @@ const workspaceRoutes = [
   {
     to: "/connect",
     title: "Connect Spotify",
-    description: "Authenticate, refresh the local session, and confirm which account is active.",
+    description: "Connect your account, refresh status, and confirm which profile is active.",
   },
   {
     to: "/time-machine",
@@ -20,7 +20,7 @@ const workspaceRoutes = [
   {
     to: "/transfer-library",
     title: "Transfer Library",
-    description: "Export and import snapshot data from a dedicated migration route.",
+    description: "Download and import snapshot data from a dedicated migration page.",
   },
   {
     to: "/advanced",
@@ -46,7 +46,7 @@ export function DashboardPage() {
           <div className="flex flex-wrap items-center gap-3">
             <span className="hero-badge">
               <LayoutGrid className="h-3.5 w-3.5" />
-              Workspace overview
+              Overview
             </span>
             <Badge variant={isAuthenticated ? "default" : "outline"}>
               {isAuthenticated ? "Spotify connected" : "Spotify not connected"}
@@ -54,12 +54,10 @@ export function DashboardPage() {
           </div>
 
           <div className="mt-6 space-y-4">
-            <h1 className="max-w-3xl text-4xl leading-tight md:text-5xl">
-              The all-in-one cockpit has been split into clearer product routes.
-            </h1>
+            <h1 className="max-w-3xl text-4xl leading-tight md:text-5xl">Use this overview as a quick launchpad into the focused flows.</h1>
             <p className="max-w-2xl text-base text-muted-foreground md:text-lg">
-              This workspace page now acts as a lightweight overview and shortcut hub while the actual tools live inside
-              their dedicated pages.
+              Connection, playlist creation, transfers, and experiments each have their own page now, so this overview
+              stays light and easy to scan.
             </p>
           </div>
 
@@ -81,7 +79,7 @@ export function DashboardPage() {
               <Wrench className="h-6 w-6" />
             </div>
             <CardTitle>Current session</CardTitle>
-            <CardDescription>The dedicated pages use this same backend session, so the overview stays useful as a quick check.</CardDescription>
+            <CardDescription>Every page uses this same Spotify connection, so the overview still works well as a quick status check.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="rounded-3xl border border-border bg-muted/45 p-4 text-sm">
@@ -113,7 +111,7 @@ export function DashboardPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               <Link to={route.to} className={buttonVariants({ variant: "secondary" })}>
-                Open route
+                Open page
                 <ArrowRight className="h-4 w-4" />
               </Link>
             </CardContent>
@@ -125,17 +123,17 @@ export function DashboardPage() {
         <Card className="animate-fade-up [animation-delay:340ms]">
           <CardHeader>
             <CardTitle>What changed</CardTitle>
-            <CardDescription>The workspace is no longer the place where every tool competes for attention.</CardDescription>
+            <CardDescription>The overview no longer tries to hold every tool at once.</CardDescription>
           </CardHeader>
           <CardContent className="grid gap-3 text-sm text-muted-foreground">
             <div className="rounded-2xl border border-border bg-white/70 px-4 py-3">
               Time-based playlist tools moved into the dedicated Time Machine journey.
             </div>
             <div className="rounded-2xl border border-border bg-white/70 px-4 py-3">
-              Snapshot export and import moved into the dedicated Transfer Library route.
+              Snapshot export and import moved into the dedicated Transfer Library page.
             </div>
             <div className="rounded-2xl border border-border bg-white/70 px-4 py-3">
-              Language experiments and artist search moved into the Advanced route.
+              Language experiments and artist search moved into the Advanced page.
             </div>
           </CardContent>
         </Card>
@@ -153,7 +151,7 @@ export function DashboardPage() {
               Start in Connect when you need to authenticate or verify the active account.
             </div>
             <div className="rounded-2xl border border-border bg-white/70 px-4 py-3">
-              Spend most of your time inside the dedicated route for the task you actually want to complete.
+              Spend most of your time inside the page that matches the task you want to complete.
             </div>
           </CardContent>
         </Card>

@@ -7,5 +7,5 @@ export const primaryNavigation = [
 
 export const workspaceNavigationItem = {
   to: "/workspace",
-  label: "Workspace",
+  label: "Overview",
 } as const

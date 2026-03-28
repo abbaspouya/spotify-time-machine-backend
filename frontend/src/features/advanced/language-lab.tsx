@@ -61,8 +61,8 @@ export function LanguageLab() {
         <CardHeader>
           <CardTitle>Language-based playlist builder</CardTitle>
           <CardDescription>
-            Ask the backend to infer languages from track and artist names, then inspect the grouped output before
-            creating a playlist.
+            Detect likely languages from track and artist names, then inspect the grouped results before creating a
+            playlist.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-5">
@@ -119,7 +119,7 @@ export function LanguageLab() {
             </div>
           ) : (
             <p className="rounded-2xl border border-border bg-muted/45 px-4 py-3 text-sm text-muted-foreground">
-              Load language groups to inspect the current backend output.
+              Load language groups to inspect the current results.
             </p>
           )}
         </CardContent>

@@ -30,8 +30,8 @@ export function TimeMachinePage() {
           <div className="mt-6 space-y-4">
             <h1 className="max-w-3xl text-4xl leading-tight md:text-5xl">Turn your liked songs into time capsule playlists.</h1>
             <p className="max-w-2xl text-base text-muted-foreground md:text-lg">
-              This route is the clearest product story in the app: pick a period, inspect the library slices, and spin
-              them into playlists that feel curated by your listening history.
+              Pick a time period, preview the slices in your library, and turn the ones you love into playlists that
+              feel shaped by your own listening history.
             </p>
           </div>
 
@@ -50,8 +50,8 @@ export function TimeMachinePage() {
             <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/12 text-primary">
               <Clock3 className="h-6 w-6" />
             </div>
-            <CardTitle>What this page will own</CardTitle>
-            <CardDescription>The full grouping and playlist creation workflow now belongs here end to end.</CardDescription>
+            <CardTitle>What you can do here</CardTitle>
+            <CardDescription>Everything from grouping to playlist creation now lives together in one focused flow.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             {features.map((feature) => (
@@ -66,8 +66,8 @@ export function TimeMachinePage() {
       <section className="grid gap-6 md:grid-cols-[1fr_1fr]">
         <Card className="animate-fade-up [animation-delay:180ms]">
           <CardHeader>
-            <CardTitle>Flow neighbors</CardTitle>
-            <CardDescription>Use the dedicated routes around this one instead of bouncing back to the old dashboard.</CardDescription>
+            <CardTitle>Useful next steps</CardTitle>
+            <CardDescription>Move between connection, playlist building, and library transfer without losing context.</CardDescription>
           </CardHeader>
           <CardContent className="flex flex-wrap gap-3">
             {currentLinks.map((link) => (
@@ -80,8 +80,8 @@ export function TimeMachinePage() {
 
         <Card className="animate-fade-up [animation-delay:220ms]">
           <CardHeader>
-            <CardTitle>Why this is the hero product</CardTitle>
-            <CardDescription>It is distinct, emotionally understandable, and already backed by real working logic.</CardDescription>
+            <CardTitle>Why it works well</CardTitle>
+            <CardDescription>It turns your listening history into something visible, memorable, and easy to share.</CardDescription>
           </CardHeader>
           <CardContent className="grid gap-3 text-sm text-muted-foreground">
             <div className="flex items-start gap-3 rounded-2xl border border-border bg-white/70 px-4 py-3">
@@ -94,7 +94,7 @@ export function TimeMachinePage() {
             </div>
             <div className="flex items-start gap-3 rounded-2xl border border-border bg-white/70 px-4 py-3">
               <Wand2 className="mt-0.5 h-4 w-4 text-primary" />
-              <span>It is already stronger as a focused product narrative than a general-purpose control panel.</span>
+              <span>It gives one clear outcome: turn a slice of your history into a playlist you can keep or share.</span>
             </div>
           </CardContent>
         </Card>

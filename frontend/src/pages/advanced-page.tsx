@@ -1,5 +1,4 @@
 import { Languages, Microscope, Search, Sparkles } from "lucide-react"
-import { Link } from "react-router-dom"
 
 import { ArtistSearchLab } from "@/features/advanced/artist-search-lab"
 import { LanguageLab } from "@/features/advanced/language-lab"
@@ -26,8 +25,8 @@ export function AdvancedPage() {
           <div className="mt-6 space-y-4">
             <h1 className="max-w-3xl text-4xl leading-tight md:text-5xl">Keep interesting experiments available without crowding the core product.</h1>
             <p className="max-w-2xl text-base text-muted-foreground md:text-lg">
-              This page is where we keep powerful but less product-shaped capabilities while the main journeys become
-              simpler and easier to trust.
+              Explore creative tools like language grouping and artist lookup while the main pages stay focused on the
+              most common journeys.
             </p>
           </div>
 
@@ -47,7 +46,7 @@ export function AdvancedPage() {
               <Microscope className="h-6 w-6" />
             </div>
             <CardTitle>What stays advanced</CardTitle>
-            <CardDescription>These capabilities are real and working, but they are still better framed as experiments than core flows.</CardDescription>
+            <CardDescription>These tools are useful today, while still feeling more exploratory than the main product pages.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             {advancedAreas.map((area) => (
@@ -67,7 +66,7 @@ export function AdvancedPage() {
         <Card className="animate-fade-up [animation-delay:180ms]">
           <CardHeader>
             <CardTitle>Current tools available</CardTitle>
-            <CardDescription>The existing experiments remain usable throughout the navigation refactor.</CardDescription>
+            <CardDescription>These exploratory tools stay available whenever you want to branch out from the core flows.</CardDescription>
           </CardHeader>
           <CardContent className="grid gap-3 text-sm text-muted-foreground">
             <div className="flex items-start gap-3 rounded-2xl border border-border bg-white/70 px-4 py-3">
@@ -83,13 +82,13 @@ export function AdvancedPage() {
 
         <Card className="animate-fade-up [animation-delay:220ms]">
           <CardHeader>
-            <CardTitle>Promotion rule</CardTitle>
-            <CardDescription>Features graduate out of Advanced when they become reliable, understandable, and central.</CardDescription>
+            <CardTitle>How tools grow</CardTitle>
+            <CardDescription>The strongest experiments can eventually become their own focused pages.</CardDescription>
           </CardHeader>
           <CardContent className="grid gap-3 text-sm text-muted-foreground">
             <div className="flex items-start gap-3 rounded-2xl border border-border bg-white/70 px-4 py-3">
               <Sparkles className="mt-0.5 h-4 w-4 text-primary" />
-              <span>If a feature has a clean user story and repeatable value, it should earn its own route later.</span>
+              <span>When a tool becomes reliable, understandable, and broadly useful, it can move into the main product experience.</span>
             </div>
           </CardContent>
         </Card>

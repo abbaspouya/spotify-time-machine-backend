@@ -74,7 +74,7 @@ export function RootLayout() {
             </span>
             <span className="metric-pill">
               <Headphones className="mr-2 h-3.5 w-3.5" />
-              FastAPI backend
+              FastAPI API
             </span>
             <span className="metric-pill">
               <Orbit className="mr-2 h-3.5 w-3.5" />
@@ -84,7 +84,7 @@ export function RootLayout() {
 
           <div className="flex items-center gap-2">
             <LayoutGrid className="h-4 w-4" />
-            <span>Structured into clearer product routes while the original workspace remains available.</span>
+            <span>Focused pages for connection, playlist creation, transfers, and experiments.</span>
           </div>
         </div>
       </footer>

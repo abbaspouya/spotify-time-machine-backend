@@ -258,7 +258,7 @@ export function TimeMachineTool() {
               <Label htmlFor="groupPlaylistName">Playlist name</Label>
               <Input
                 id="groupPlaylistName"
-                placeholder="Leave blank to use the backend default"
+                placeholder="Leave blank to use an automatic title"
                 value={groupPlaylistName}
                 onChange={(event) => setGroupPlaylistName(event.target.value)}
               />

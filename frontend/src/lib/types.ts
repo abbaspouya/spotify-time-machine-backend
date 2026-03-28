@@ -77,23 +77,34 @@ export type ExportSnapshotPayload = {
   include_liked_tracks: boolean
   include_saved_albums: boolean
   include_followed_artists: boolean
-  write_to_file: boolean
+  write_to_file?: boolean
   output_file_name?: string
-  return_snapshot: boolean
+  return_snapshot?: boolean
+}
+
+export type SnapshotDocument = Record<string, unknown>
+
+export type SnapshotCounts = {
+  playlists: number
+  playlist_tracks: number
+  liked_tracks: number
+  saved_albums: number
+  followed_artists: number
 }
 
 export type ExportSnapshotResponse = {
   message: string
   file_path: string | null
-  counts: Record<string, number>
+  counts: SnapshotCounts
   source_user_id: string | null
   exported_at: string | null
   cutoff_date: string | null
-  snapshot?: Record<string, unknown>
+  snapshot?: SnapshotDocument
 }
 
 export type ImportSnapshotPayload = {
-  file_path: string
+  file_path?: string
+  snapshot?: SnapshotDocument
   import_playlists: boolean
   import_liked_tracks: boolean
   import_saved_albums: boolean
@@ -102,7 +113,38 @@ export type ImportSnapshotPayload = {
   strict_liked_order: boolean
 }
 
+export type ImportSnapshotSummary = {
+  playlists_created: number
+  playlist_tracks_added: number
+  playlist_tracks_failed: number
+  playlists_removed: number
+  liked_tracks_added: number
+  liked_tracks_failed: number
+  liked_tracks_removed: number
+  saved_albums_added: number
+  saved_albums_failed: number
+  saved_albums_removed: number
+  followed_artists_added: number
+  followed_artists_failed: number
+  followed_artists_removed: number
+}
+
+export type ImportedPlaylistSummary = {
+  id: string | null
+  name: string
+  external_url: string | null
+}
+
+export type ImportSnapshotResult = {
+  imported_at: string
+  target_user_id: string | null
+  source_user_id: string | null
+  summary: ImportSnapshotSummary
+  created_playlists: ImportedPlaylistSummary[]
+  warnings: string[]
+}
+
 export type ImportSnapshotResponse = {
   message: string
-  result: Record<string, unknown>
+  result: ImportSnapshotResult
 }

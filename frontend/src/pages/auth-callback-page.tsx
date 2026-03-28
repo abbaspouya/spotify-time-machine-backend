@@ -44,14 +44,14 @@ export function AuthCallbackPage() {
           <CardTitle>{isSuccess ? "Spotify connection complete" : "Spotify connection failed"}</CardTitle>
           <CardDescription>
             {isSuccess
-              ? "The backend cached your Spotify session and the dashboard is refreshing."
+              ? "Your Spotify connection is ready and the app is refreshing."
               : detail || "Spotify did not return a usable authorization code."}
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
           <div className="rounded-2xl border border-border bg-muted/55 px-4 py-3 text-sm text-muted-foreground">
             <LoaderCircle className="mr-2 inline h-4 w-4 animate-spin" />
-            Redirecting back to the workspace now.
+            Redirecting back to the app now.
           </div>
           <Link to="/" className={cn(buttonVariants({ variant: "outline" }), "w-fit")}>
             Return now

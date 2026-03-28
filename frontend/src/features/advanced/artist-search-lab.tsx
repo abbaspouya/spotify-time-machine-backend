@@ -29,7 +29,7 @@ export function ArtistSearchLab() {
         <CardHeader>
           <CardTitle>Artist lookup</CardTitle>
           <CardDescription>
-            A search-heavy screen powered by TanStack Query and a deferred input, now moved into the Advanced route.
+            Search Spotify artists quickly and browse a lightweight card view with the basics you usually want first.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -71,7 +71,7 @@ export function ArtistSearchLab() {
         <CardHeader>
           <CardTitle>Search results</CardTitle>
           <CardDescription>
-            Results stay intentionally lightweight, but they already mirror the backend payload structure.
+            Results stay compact so you can scan artists, popularity, and genres without a heavy detail view.
           </CardDescription>
         </CardHeader>
         <CardContent>

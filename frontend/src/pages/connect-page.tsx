@@ -27,8 +27,8 @@ export function ConnectPage() {
               Connect Spotify once, then move into the product flows that matter.
             </h1>
             <p className="max-w-2xl text-base text-muted-foreground md:text-lg">
-              This route becomes the front door for authentication, account readiness, and the first step into the Time
-              Machine and library transfer journeys.
+              Start here to connect your account, confirm that everything is ready, and then head into playlist
+              creation or library transfer.
             </p>
           </div>
 
@@ -55,7 +55,7 @@ export function ConnectPage() {
             </div>
             <CardTitle>Connection status</CardTitle>
             <CardDescription>
-              Authentication still lives on the backend, but this page now owns the user-facing status check.
+              Keep your current Spotify connection visible, refresh it when needed, and confirm which account is active.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -90,7 +90,7 @@ export function ConnectPage() {
 
             <div className="flex flex-wrap gap-3">
               <Link to="/workspace" className={buttonVariants({ variant: "secondary" })}>
-                Open current workspace
+                Open overview
               </Link>
               <a
                 href={getDocsUrl()}
@@ -115,7 +115,7 @@ export function ConnectPage() {
             <CardDescription>Turn your liked songs into grouped time capsules and create playlists from them.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4 text-sm text-muted-foreground">
-            <p>The full grouping and playlist creation flow now lives in its own dedicated product route.</p>
+            <p>Browse your listening history by time period and turn those slices into playlists.</p>
             <Link to="/time-machine" className={buttonVariants({ variant: "secondary" })}>
               Open Time Machine
               <ArrowRight className="h-4 w-4" />
@@ -132,7 +132,7 @@ export function ConnectPage() {
             <CardDescription>Export and import account snapshots from a migration-focused page.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4 text-sm text-muted-foreground">
-            <p>The snapshot tooling no longer has to compete for space inside the old all-in-one dashboard.</p>
+            <p>Download a snapshot, upload it into another account, and keep track of what was applied.</p>
             <Link to="/transfer-library" className={buttonVariants({ variant: "secondary" })}>
               Open Transfer Library
               <ArrowRight className="h-4 w-4" />
@@ -149,14 +149,14 @@ export function ConnectPage() {
             <CardDescription>Experimental tools like language grouping and artist lookup now have their own home.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4 text-sm text-muted-foreground">
-            <p>The workspace route is now a lighter overview, while the actual experimental tools live in Advanced.</p>
+            <p>Explore language grouping and artist search without interrupting the main flows.</p>
             <div className="flex flex-wrap gap-3">
               <Link to="/advanced" className={buttonVariants({ variant: "secondary" })}>
                 Open Advanced
                 <ArrowRight className="h-4 w-4" />
               </Link>
               <Link to="/workspace" className={buttonVariants({ variant: "outline" })}>
-                Open Workspace
+                Open Overview
               </Link>
             </div>
           </CardContent>
