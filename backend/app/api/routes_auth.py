@@ -2,10 +2,12 @@ from fastapi import APIRouter, Query, Request
 from fastapi.responses import JSONResponse, RedirectResponse
 
 from ..core.auth import get_oauth_for_session, get_spotify_client
+from ..core.observability import get_logger
 from ..core.session_store import ensure_session_id, get_session_id_from_request, set_session_cookie
 from .helpers import build_auth_status_response, build_frontend_redirect
 
 router = APIRouter(tags=["Authentication"])
+logger = get_logger("auth")
 
 
 @router.get("/login", summary="Start Spotify OAuth login")
@@ -40,7 +42,7 @@ def login(
     return response
 
 
-@router.get("/callback", summary="Handle Spotify OAuth callback")
+@router.get("/callback", summary="Handle Spotify OAuth callback", include_in_schema=False)
 def callback(request: Request):
     session_id = get_session_id_from_request(request) or ensure_session_id(request)
     sp_oauth = get_oauth_for_session(session_id)
@@ -64,9 +66,10 @@ def callback(request: Request):
         token_info = sp_oauth.get_access_token(code, as_dict=True)
         if isinstance(token_info, dict):
             sp_oauth.cache_handler.save_token_to_cache(token_info)
-    except Exception as exc:
+    except Exception:
+        logger.exception("spotify_oauth_callback_failed")
         response = RedirectResponse(
-            url=build_frontend_redirect("error", f"Authorization failed: {exc}"),
+            url=build_frontend_redirect("error", "Authorization failed. Please try again."),
             status_code=303,
         )
         set_session_cookie(response, session_id)
@@ -82,7 +85,7 @@ def auth_status(request: Request):
     return build_auth_status_response(request)
 
 
-@router.get("/get_token", deprecated=True, summary="Check auth state (legacy)")
+@router.get("/get_token", deprecated=True, summary="Check auth state (legacy)", include_in_schema=False)
 def get_token(request: Request):
     # Legacy route kept for compatibility, but do not expose tokens to the browser.
     return build_auth_status_response(request)

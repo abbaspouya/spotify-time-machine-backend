@@ -8,11 +8,13 @@ import secrets
 from fastapi import HTTPException
 
 from .config import JOB_RETENTION_SECONDS
+from .observability import get_logger
 
 
 JobWorker = Callable[[Callable[[int | None, str], None]], Any]
 _JOB_LOCK = Lock()
 _JOBS: dict[str, dict[str, Any]] = {}
+logger = get_logger("jobs")
 
 
 def _utc_now() -> datetime:
@@ -62,6 +64,7 @@ def _update_job(job_id: str, **changes: Any) -> None:
 
 def _run_job(job_id: str, worker: JobWorker) -> None:
     _update_job(job_id, status="running", message="Job started")
+    logger.info("job_started", extra={"job_id": job_id, "job_kind": _JOBS.get(job_id, {}).get("kind")})
 
     def progress(progress_value: int | None, message: str) -> None:
         _update_job(job_id, progress=progress_value, message=message)
@@ -76,6 +79,10 @@ def _run_job(job_id: str, worker: JobWorker) -> None:
             message="Job failed",
             finished_at=_utc_now_iso(),
         )
+        logger.warning(
+            "job_failed",
+            extra={"job_id": job_id, "job_kind": _JOBS.get(job_id, {}).get("kind")},
+        )
         return
     except Exception as exc:
         _update_job(
@@ -84,6 +91,10 @@ def _run_job(job_id: str, worker: JobWorker) -> None:
             error=str(exc) or exc.__class__.__name__,
             message="Job failed",
             finished_at=_utc_now_iso(),
+        )
+        logger.exception(
+            "job_failed",
+            extra={"job_id": job_id, "job_kind": _JOBS.get(job_id, {}).get("kind")},
         )
         return
 
@@ -95,6 +106,7 @@ def _run_job(job_id: str, worker: JobWorker) -> None:
         result=result,
         finished_at=_utc_now_iso(),
     )
+    logger.info("job_completed", extra={"job_id": job_id, "job_kind": _JOBS.get(job_id, {}).get("kind")})
 
 
 def create_job(kind: str, session_id: str, worker: JobWorker) -> dict[str, Any]:

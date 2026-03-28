@@ -31,6 +31,15 @@ def _extract_origin(url: str) -> str:
     return f"{parsed.scheme}://{parsed.netloc}"
 
 
+def _validate_absolute_url(name: str, url: str) -> None:
+    parsed = urlsplit(url)
+    if not parsed.scheme or not parsed.netloc:
+        raise RuntimeError(f"{name} must include a scheme and host, for example http://127.0.0.1:8000/callback")
+
+
+_validate_absolute_url("SPOTIFY_REDIRECT_URI", SPOTIFY_REDIRECT_URI)
+
+
 def _parse_csv_env(name: str, defaults: list[str]) -> list[str]:
     raw_value = os.getenv(name, "")
     if not raw_value.strip():
@@ -72,3 +81,16 @@ SESSION_COOKIE_SECURE = _parse_bool_env("SESSION_COOKIE_SECURE", False)
 SESSION_COOKIE_SAMESITE = os.getenv("SESSION_COOKIE_SAMESITE", "lax").strip().lower() or "lax"
 SESSION_COOKIE_MAX_AGE_SECONDS = int(os.getenv("SESSION_COOKIE_MAX_AGE_SECONDS", "2592000"))
 JOB_RETENTION_SECONDS = int(os.getenv("JOB_RETENTION_SECONDS", "21600"))
+LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").strip().upper() or "INFO"
+
+if SESSION_COOKIE_SAMESITE not in {"lax", "strict", "none"}:
+    raise RuntimeError("SESSION_COOKIE_SAMESITE must be one of: lax, strict, none.")
+
+if SESSION_COOKIE_SAMESITE == "none" and not SESSION_COOKIE_SECURE:
+    raise RuntimeError("SESSION_COOKIE_SECURE must be true when SESSION_COOKIE_SAMESITE is 'none'.")
+
+if SESSION_COOKIE_MAX_AGE_SECONDS <= 0:
+    raise RuntimeError("SESSION_COOKIE_MAX_AGE_SECONDS must be greater than zero.")
+
+if JOB_RETENTION_SECONDS <= 0:
+    raise RuntimeError("JOB_RETENTION_SECONDS must be greater than zero.")

@@ -13,6 +13,7 @@ env/
 .env
 backend/.env
 backend/.cache
+backend/.sessions/
 
 # IDE / Editor
 .vscode/

@@ -1,6 +1,4 @@
 from fastapi import APIRouter, HTTPException, Request
-from spotipy.exceptions import SpotifyException
-
 from ..core.auth import get_spotify_client
 from ..schemas.account_snapshot import (
     ExportAccountSnapshotRequest,
@@ -32,12 +30,6 @@ def export_account_snapshot_endpoint(request: Request, payload: ExportAccountSna
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
-    except SpotifyException as exc:
-        status = getattr(exc, "http_status", None) or 502
-        message = getattr(exc, "msg", str(exc))
-        raise HTTPException(status_code=status, detail=f"Spotify API error: {message}")
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Unexpected export error: {exc}")
 
     file_path = None
     if payload.write_to_file:

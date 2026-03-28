@@ -7,7 +7,7 @@ import { buttonVariants } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 
 const advancedAreas = [
-  "Language grouping based on track and artist naming patterns.",
+  "Beta language grouping based on track and artist naming patterns.",
   "Artist lookup and other exploratory search utilities.",
   "Future experiments that are useful but not yet strong enough for the core flow.",
 ]
@@ -71,7 +71,7 @@ export function AdvancedPage() {
           <CardContent className="grid gap-3 text-sm text-muted-foreground">
             <div className="flex items-start gap-3 rounded-2xl border border-border bg-white/70 px-4 py-3">
               <Languages className="mt-0.5 h-4 w-4 text-primary" />
-              <span>Language grouping stays available as a creative playlist experiment.</span>
+              <span>Language grouping stays available as a beta playlist experiment.</span>
             </div>
             <div className="flex items-start gap-3 rounded-2xl border border-border bg-white/70 px-4 py-3">
               <Search className="mt-0.5 h-4 w-4 text-primary" />

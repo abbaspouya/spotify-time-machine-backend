@@ -5,11 +5,11 @@ API_TAGS = [
     },
     {
         "name": "Authentication",
-        "description": "Spotify OAuth flow, session status, and current user details.",
+        "description": "Spotify OAuth flow, browser-session status, and current user details.",
     },
     {
         "name": "Playlists",
-        "description": "Group liked songs and create playlists from those groups.",
+        "description": "Group liked songs and create playlists, including beta language grouping tools.",
     },
     {
         "name": "Discovery",
@@ -21,6 +21,6 @@ API_TAGS = [
     },
     {
         "name": "Jobs",
-        "description": "Async job creation and polling for long-running operations.",
+        "description": "Async job creation and polling for long-running operations such as grouping and snapshot transfers.",
     },
 ]

@@ -61,6 +61,11 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     : await response.text()
 
   if (!response.ok) {
+    const requestId =
+      typeof payload === "object" && payload !== null && "request_id" in payload
+        ? String(payload.request_id)
+        : undefined
+
     const message =
       typeof payload === "object" && payload !== null && "detail" in payload
         ? String(payload.detail)
@@ -68,7 +73,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
           ? payload
           : "Request failed"
 
-    throw new ApiError(response.status, message)
+    throw new ApiError(response.status, requestId ? `${message} (Request ID: ${requestId})` : message)
   }
 
   return payload as T

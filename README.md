@@ -1,8 +1,8 @@
-# Spotify
+# Spotify Time Machine
 
-Full-stack repo layout with a FastAPI backend and a placeholder frontend workspace.
+Full-stack app for connecting a Spotify account, turning liked songs into time-based playlists, and moving library data between accounts with safer snapshot previews.
 
-## Project Structure
+## Repo Layout
 
 ```text
 Spotify/
@@ -10,39 +10,47 @@ Spotify/
     app/
     requirements.txt
     .env
+    .sessions/
     exports/
+    tests/
   frontend/
     package.json
     src/
+    scripts/
+  .github/workflows/
+  docs/
   README.md
 ```
 
-## Backend Prerequisites
+## Local Setup
 
-- Python 3.10+
-- Spotify app credentials
+### Backend environment
 
-## Backend Environment Variables
+Copy [backend/.env.example](backend/.env.example) to `backend/.env` and fill in your Spotify app credentials.
 
-Create or update `backend/.env`:
+Important values:
 
-```env
-SPOTIFY_CLIENT_ID=your_client_id
-SPOTIFY_CLIENT_SECRET=your_client_secret
-SPOTIFY_REDIRECT_URI=http://127.0.0.1:8000/callback
-FRONTEND_URL=http://127.0.0.1:5173
-# Optional: comma-separated override for allowed frontend origins
-# CORS_ALLOW_ORIGINS=http://127.0.0.1:5173,http://localhost:5173
-# Optional: frontend route that receives auth status redirects
-# FRONTEND_AUTH_CALLBACK_PATH=/auth/callback
-```
+- `SPOTIFY_CLIENT_ID`
+- `SPOTIFY_CLIENT_SECRET`
+- `SPOTIFY_REDIRECT_URI`
+- `FRONTEND_URL`
 
-`SPOTIFY_REDIRECT_URI` must match the Redirect URI configured in your Spotify Developer dashboard.
-`FRONTEND_URL` is the base URL the backend uses after Spotify login succeeds or fails.
+Session and job settings can also be tuned in production:
 
-## Install Backend Dependencies
+- `SESSION_COOKIE_SECURE`
+- `SESSION_COOKIE_SAMESITE`
+- `SESSION_COOKIE_DOMAIN`
+- `SESSION_COOKIE_MAX_AGE_SECONDS`
+- `JOB_RETENTION_SECONDS`
+- `LOG_LEVEL`
 
-From the repo root:
+### Frontend environment
+
+Copy [frontend/.env.example](frontend/.env.example) to `frontend/.env` if you want to override the backend URL.
+
+## Install
+
+Backend:
 
 ```powershell
 python -m venv .venv
@@ -50,108 +58,87 @@ python -m venv .venv
 pip install -r backend/requirements.txt
 ```
 
-## Run The Backend
-
-From the repo root:
-
-```powershell
-python -m uvicorn backend.app.main:app --reload --host 127.0.0.1 --port 8000
-```
-
-Backend base URL: `http://127.0.0.1:8000/`
-
-## Quick Check
-
-- Health check: `GET http://127.0.0.1:8000/ping`
-- Start Spotify auth flow: `GET http://127.0.0.1:8000/login`
-- Check backend auth state without exposing the Spotify token: `GET http://127.0.0.1:8000/auth_status`
-- After Spotify auth completes, the backend redirects to `FRONTEND_URL/auth/callback?status=success` by default.
-
-## OAuth Scope Notes
-
-This app uses read/write scopes for playlists, library, and follows for snapshot export/import.
-If you previously authenticated with smaller scopes, delete `backend/.cache` and run `/login` again to refresh consent.
-
-## Account Snapshot Export/Import
-
-Use these endpoints to move playlists and library data between Spotify accounts.
-
-### 1) Export snapshot
-
-`POST /export_account_snapshot`
-
-Example request:
-
-```json
-{
-  "cutoff_date": "2026-02-23T00:00:00Z",
-  "include_playlists": true,
-  "include_liked_tracks": true,
-  "include_saved_albums": true,
-  "include_followed_artists": true,
-  "write_to_file": true,
-  "output_file_name": "my-source-account-snapshot.json",
-  "return_snapshot": false
-}
-```
-
-When `write_to_file=true`, the file is written under `backend/exports/`.
-
-### 2) Import snapshot
-
-Authenticate as the target account first, then call:
-`POST /import_account_snapshot`
-
-Example request:
-
-```json
-{
-  "file_path": "backend/exports/my-source-account-snapshot.json",
-  "import_playlists": true,
-  "import_liked_tracks": true,
-  "import_saved_albums": true,
-  "import_followed_artists": true
-}
-```
-
-The import endpoint also accepts `exports/my-source-account-snapshot.json` or just the file name when the snapshot exists inside `backend/exports/`.
-
-## Frontend
-
-The frontend now uses React + Vite + TypeScript + TanStack Query with a Tailwind/shadcn-style component layer.
-
-Create `frontend/.env` if you want to override the backend base URL:
-
-```env
-VITE_API_BASE_URL=http://127.0.0.1:8000
-```
-
-Install frontend dependencies:
+Frontend:
 
 ```powershell
 cd frontend
 npm install
 ```
 
-Run the frontend:
+## Run
+
+Backend:
+
+```powershell
+python -m uvicorn backend.app.main:app --reload --host 127.0.0.1 --port 8000
+```
+
+Frontend:
 
 ```powershell
 cd frontend
 npm run dev
 ```
 
-The local frontend dev server runs at `http://127.0.0.1:5173/`.
+Local URLs:
 
-Current frontend MVP includes:
+- Backend: `http://127.0.0.1:8000`
+- Frontend: `http://127.0.0.1:5173`
+- Swagger: `http://127.0.0.1:8000/docs`
 
-- Spotify auth status + backend session refresh
-- Liked songs grouped by time period with playlist creation
-- Language grouping with playlist creation
-- Snapshot export/import forms
-- Artist search powered by the existing backend endpoint
+## Main Product Flows
 
-For local development, the backend already allows `http://127.0.0.1:5173` and `http://localhost:5173` through CORS by default.
+- `Connect Spotify`: browser-session-based Spotify OAuth and account status
+- `Time Machine`: async grouping of liked songs into time slices and playlist creation
+- `Transfer Library`: snapshot export job, import preview, destructive confirmation, and async import job
+- `Advanced`: beta language grouping plus artist search
 
-## Development Notes
+## Development Commands
 
-Git workflow and commit prefix conventions are documented in `CONTRIBUTING.md`.
+Backend tests:
+
+```powershell
+python -m unittest discover -s backend/tests -p "test_*.py" -v
+```
+
+Frontend smoke test:
+
+```powershell
+cd frontend
+npm run test:smoke
+```
+
+Frontend production build:
+
+```powershell
+cd frontend
+npm run build
+```
+
+Backend syntax check:
+
+```powershell
+python -m compileall backend/app
+```
+
+## CI
+
+GitHub Actions runs:
+
+- backend unit tests
+- backend compile check
+- frontend smoke test
+- frontend production build
+
+Workflow: [ci.yml](.github/workflows/ci.yml)
+
+## Deployment And Privacy
+
+- Deployment guide: [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)
+- Privacy and data handling: [docs/PRIVACY.md](docs/PRIVACY.md)
+
+## Notes
+
+- The backend stores browser-session token data under `backend/.sessions/` for local and self-hosted use.
+- Snapshot files can still be written to `backend/exports/`, but the frontend now defaults to browser download/upload flows.
+- Internal auth callback routes are intentionally hidden from the public OpenAPI docs.
