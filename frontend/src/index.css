@@ -6,25 +6,25 @@
 
 @layer base {
   :root {
-    --background: 45 57% 96%;
-    --foreground: 196 25% 14%;
-    --card: 0 0% 100%;
-    --card-foreground: 196 25% 14%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 196 25% 14%;
-    --primary: 141 73% 38%;
-    --primary-foreground: 48 100% 98%;
-    --secondary: 186 31% 89%;
-    --secondary-foreground: 196 27% 18%;
-    --muted: 38 38% 92%;
-    --muted-foreground: 195 11% 37%;
-    --accent: 22 86% 62%;
-    --accent-foreground: 48 100% 98%;
+    --background: 220 19% 6%;
+    --foreground: 210 20% 95%;
+    --card: 220 16% 10%;
+    --card-foreground: 210 20% 95%;
+    --popover: 220 16% 10%;
+    --popover-foreground: 210 20% 95%;
+    --primary: 141 73% 42%;
+    --primary-foreground: 220 26% 8%;
+    --secondary: 220 11% 20%;
+    --secondary-foreground: 210 20% 92%;
+    --muted: 220 12% 15%;
+    --muted-foreground: 218 11% 68%;
+    --accent: 218 9% 56%;
+    --accent-foreground: 220 26% 8%;
     --destructive: 0 74% 53%;
-    --destructive-foreground: 48 100% 98%;
-    --border: 34 32% 84%;
-    --input: 34 32% 84%;
-    --ring: 141 73% 38%;
+    --destructive-foreground: 210 20% 95%;
+    --border: 220 10% 22%;
+    --input: 220 10% 18%;
+    --ring: 141 73% 42%;
   }
 
   * {
@@ -38,13 +38,14 @@
   body {
     @apply min-h-screen bg-background font-body text-foreground antialiased;
     background-image:
-      radial-gradient(circle at top left, rgba(250, 139, 73, 0.16), transparent 26%),
-      radial-gradient(circle at top right, rgba(29, 185, 84, 0.14), transparent 22%),
-      linear-gradient(180deg, rgba(255, 255, 255, 0.6), rgba(255, 255, 255, 0)),
-      linear-gradient(rgba(19, 53, 58, 0.04) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(19, 53, 58, 0.04) 1px, transparent 1px);
-    background-size: auto, auto, auto, 22px 22px, 22px 22px;
-    background-position: center, center, center, center, center;
+      radial-gradient(circle at top left, rgba(29, 185, 84, 0.22), transparent 25%),
+      radial-gradient(circle at top right, rgba(148, 163, 184, 0.16), transparent 28%),
+      radial-gradient(circle at bottom center, rgba(255, 255, 255, 0.05), transparent 32%),
+      linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0)),
+      linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+    background-size: auto, auto, auto, auto, 22px 22px, 22px 22px;
+    background-position: center, center, center, center, center, center;
   }
 
   #root {
@@ -61,14 +62,64 @@
 
 @layer components {
   .section-shell {
-    @apply rounded-3xl border border-white/70 bg-white/80 p-5 shadow-panel backdrop-blur md:p-6;
+    @apply rounded-3xl border border-white/10 bg-card/85 p-5 shadow-panel backdrop-blur md:p-6;
   }
 
   .hero-badge {
-    @apply inline-flex items-center gap-2 rounded-full border border-foreground/10 bg-white/75 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-foreground/70;
+    @apply inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-foreground/70;
   }
 
   .metric-pill {
-    @apply inline-flex items-center rounded-full bg-secondary/70 px-3 py-1 text-xs font-medium text-secondary-foreground;
+    @apply inline-flex items-center rounded-full border border-white/10 bg-secondary/75 px-3 py-1 text-xs font-medium text-secondary-foreground;
+  }
+}
+
+@layer utilities {
+  .bg-white {
+    background-color: hsl(var(--card));
+  }
+
+  .bg-white\/60 {
+    background-color: hsl(var(--card) / 0.6);
+  }
+
+  .bg-white\/65 {
+    background-color: hsl(var(--card) / 0.65);
+  }
+
+  .bg-white\/70 {
+    background-color: hsl(var(--card) / 0.7);
+  }
+
+  .bg-white\/75 {
+    background-color: hsl(var(--card) / 0.75);
+  }
+
+  .bg-white\/80 {
+    background-color: hsl(var(--card) / 0.8);
+  }
+
+  .bg-white\/85 {
+    background-color: hsl(var(--card) / 0.85);
+  }
+
+  .border-white\/60 {
+    border-color: hsl(var(--border) / 0.75);
+  }
+
+  .border-white\/70 {
+    border-color: hsl(var(--border) / 0.82);
+  }
+
+  .border-white\/75 {
+    border-color: hsl(var(--border) / 0.9);
+  }
+
+  .hover\:bg-white:hover {
+    background-color: hsl(var(--card));
+  }
+
+  .hover\:bg-white\/85:hover {
+    background-color: hsl(var(--card) / 0.92);
   }
 }

@@ -43,8 +43,8 @@ const config: Config = {
         body: ['"IBM Plex Sans"', "ui-sans-serif", "system-ui"],
       },
       boxShadow: {
-        panel: "0 24px 70px -36px rgba(21, 39, 43, 0.48)",
-        glow: "0 20px 60px -30px rgba(23, 151, 90, 0.4)",
+        panel: "0 28px 80px -36px rgba(0, 0, 0, 0.72)",
+        glow: "0 24px 70px -28px rgba(29, 185, 84, 0.38)",
       },
       keyframes: {
         "fade-up": {
