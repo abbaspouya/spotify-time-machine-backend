@@ -1,36 +1,53 @@
-import { ArrowRight, ArrowRightLeft, Disc3, LibraryBig, ShieldCheck, Sparkles } from "lucide-react"
+import {
+  ArrowRight,
+  ArrowRightLeft,
+  CalendarRange,
+  Check,
+  Disc3,
+  LibraryBig,
+  Microscope,
+  ShieldCheck,
+} from "lucide-react"
 import { Link } from "react-router-dom"
 
 import { Button, buttonVariants } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { useSpotifySession } from "@/features/spotify/use-spotify-session"
-import { cn } from "@/lib/utils"
 
 const productCards = [
   {
     title: "Time Machine",
-    description: "Turn liked songs into time-based playlists you can keep, revisit, and share.",
+    description: "Group liked songs by month, quarter, half-year, or year and turn the best slices into Spotify playlists.",
     to: "/app/time-machine",
-    icon: LibraryBig,
+    icon: CalendarRange,
+    label: "Main flow",
   },
   {
     title: "Transfer Library",
-    description: "Move playlists and saved library data between accounts with clearer snapshot previews.",
+    description: "Export a snapshot from one account, preview what matters, and apply it into another with clearer steps.",
     to: "/app/transfer-library",
     icon: ArrowRightLeft,
+    label: "Migration flow",
   },
   {
     title: "Advanced",
-    description: "Keep experimental tools available without crowding the main product flows.",
+    description: "Keep experimental tools like language grouping and artist lookup available without crowding the core product.",
     to: "/app/advanced",
-    icon: Sparkles,
+    icon: Microscope,
+    label: "Extra tools",
   },
 ] as const
 
 const steps = [
   "Connect Spotify once so the app can work against your current account.",
-  "Choose the flow you need inside the dashboard instead of learning the whole app at the door.",
-  "Create playlists, transfer a library, or explore advanced tools from a cleaner workspace.",
+  "Choose the flow you want from the dashboard instead of sorting through every tool on the homepage.",
+  "Create time-capsule playlists, transfer a library, or explore advanced tools when you need them.",
+] as const
+
+const trustPoints = [
+  "Work from your own Spotify account instead of guessing how the tools behave on your library.",
+  "Create playlists directly inside Spotify when a time slice is worth keeping.",
+  "Preview transfer work before import so the migration flow stays easier to reason about.",
 ] as const
 
 export function LandingPage() {
@@ -38,20 +55,20 @@ export function LandingPage() {
 
   return (
     <div className="container space-y-10 py-8 md:space-y-14 md:py-12">
-      <section className="grid gap-6 lg:grid-cols-[1.15fr_0.85fr]">
-        <div className="section-shell animate-fade-up overflow-hidden">
+      <section className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
+        <div className="section-shell animate-fade-up overflow-hidden border-primary/20 bg-[linear-gradient(180deg,rgba(29,185,84,0.12),rgba(255,255,255,0.02)_30%,rgba(255,255,255,0))]">
           <div className="flex flex-wrap items-center gap-3">
-            <span className="hero-badge">Connect first</span>
-            <span className="metric-pill">Spotify login leads into the dashboard</span>
+            <span className="hero-badge">Spotify login first</span>
+            <span className="metric-pill">One connection, focused flows after</span>
           </div>
 
           <div className="mt-6 space-y-4">
             <h1 className="max-w-4xl text-4xl leading-tight md:text-5xl lg:text-6xl">
-              Connect Spotify and turn your library into clearer actions.
+              Turn your Spotify library into time-capsule playlists and cleaner transfers.
             </h1>
             <p className="max-w-2xl text-base text-muted-foreground md:text-lg">
-              Build time-capsule playlists from liked songs, move a library between accounts with safer previews, and
-              keep the heavier navigation inside the app where it belongs.
+              Connect once, then group liked songs by time, preview library snapshots before import, and keep advanced
+              tools available without making the first screen feel like a dashboard.
             </p>
           </div>
 
@@ -68,89 +85,101 @@ export function LandingPage() {
               </Button>
             )}
             <a href="#product-flows" className={buttonVariants({ variant: "outline", size: "lg" })}>
-              See the flows
+              Explore the product
             </a>
+          </div>
+
+          <div className="mt-8 flex flex-wrap gap-2 text-sm text-muted-foreground">
+            <span className="metric-pill">Liked songs into playlists</span>
+            <span className="metric-pill">Snapshot preview before import</span>
+            <span className="metric-pill">Advanced tools kept separate</span>
           </div>
         </div>
 
-        <Card className="animate-fade-up [animation-delay:120ms]">
-          <CardHeader>
-            <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/12 text-primary">
-              <ShieldCheck className="h-6 w-6" />
+        <Card className="animate-fade-up overflow-hidden border-white/15 bg-card/92 [animation-delay:120ms]">
+          <CardHeader className="border-b border-white/10 pb-5">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-foreground/55">Inside the dashboard</p>
+                <CardTitle className="mt-2">What opens after you connect</CardTitle>
+              </div>
+              <div className="rounded-full border border-primary/25 bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
+                Spotify ready
+              </div>
             </div>
-            <CardTitle>What opens after login</CardTitle>
             <CardDescription>
-              The homepage stays simple. The dashboard handles the real navigation once Spotify is connected.
+              The homepage stays lean. The real navigation and account-specific work start after Spotify login.
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-3">
-            {productCards.map(({ title, description, to, icon: Icon }) => (
-              <Link
+          <CardContent className="grid gap-3 pt-6">
+            {productCards.map(({ title, description, icon: Icon, label }) => (
+              <div
                 key={title}
-                to={to}
-                className={cn(
-                  "flex items-start gap-3 rounded-2xl border border-border bg-white/70 px-4 py-4 text-left transition-colors",
-                  "hover:border-white/70 hover:bg-white/80",
-                )}
+                className="rounded-3xl border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.06),rgba(255,255,255,0.02))] p-4"
               >
-                <div className="mt-0.5 flex h-10 w-10 items-center justify-center rounded-2xl bg-primary/12 text-primary">
-                  <Icon className="h-5 w-5" />
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-start gap-3">
+                    <div className="mt-0.5 flex h-10 w-10 items-center justify-center rounded-2xl bg-primary/12 text-primary">
+                      <Icon className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <p className="font-semibold text-foreground">{title}</p>
+                      <p className="mt-1 text-sm text-muted-foreground">{description}</p>
+                    </div>
+                  </div>
+                  <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] font-medium text-foreground/70">
+                    {label}
+                  </span>
                 </div>
-                <div className="space-y-1">
-                  <p className="font-semibold text-foreground">{title}</p>
-                  <p className="text-sm text-muted-foreground">{description}</p>
-                </div>
-              </Link>
+              </div>
             ))}
           </CardContent>
         </Card>
       </section>
 
-      <section id="product-flows" className="grid gap-6 md:grid-cols-3">
-        {productCards.map(({ title, description, to, icon: Icon }) => (
-          <Card key={title} className="animate-fade-up">
-            <CardHeader>
-              <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-2xl bg-primary/12 text-primary">
-                <Icon className="h-5 w-5" />
-              </div>
-              <CardTitle>{title}</CardTitle>
-              <CardDescription>{description}</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Link to={to} className={buttonVariants({ variant: "secondary" })}>
-                Open in dashboard
-                <ArrowRight className="h-4 w-4" />
-              </Link>
-            </CardContent>
-          </Card>
-        ))}
+      <section id="product-flows" className="space-y-5">
+        <div className="space-y-2">
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-foreground/55">What you can do</p>
+          <h2 className="text-3xl md:text-4xl">Three focused ways to work with your Spotify library.</h2>
+          <p className="max-w-2xl text-muted-foreground">
+            Start with the product story here, then pick the exact workflow you want once you are inside the app.
+          </p>
+        </div>
+
+        <div className="grid gap-6 md:grid-cols-3">
+          {productCards.map(({ title, description, to, icon: Icon, label }) => (
+            <Card key={title} className="animate-fade-up border-white/10 bg-card/88">
+              <CardHeader>
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary/12 text-primary">
+                    <Icon className="h-5 w-5" />
+                  </div>
+                  <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] font-medium text-foreground/70">
+                    {label}
+                  </span>
+                </div>
+                <CardTitle>{title}</CardTitle>
+                <CardDescription>{description}</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Link to={to} className={buttonVariants({ variant: "secondary" })}>
+                  Open in dashboard
+                  <ArrowRight className="h-4 w-4" />
+                </Link>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
       </section>
 
-      <section className="grid gap-6 lg:grid-cols-[0.9fr_1.1fr]">
-        <Card className="animate-fade-up [animation-delay:120ms]">
+      <section className="grid gap-6 lg:grid-cols-[1fr_1fr]">
+        <Card className="animate-fade-up border-white/10 bg-card/88 [animation-delay:120ms]">
           <CardHeader>
-            <CardTitle>Why it feels clearer</CardTitle>
-            <CardDescription>
-              One Spotify connection opens the product without forcing every page and tool into the first screen.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="grid gap-3 text-sm text-muted-foreground">
-            <div className="rounded-2xl border border-border bg-white/70 px-4 py-3">
-              Start with one action instead of deciding between every tool before the app knows your account.
+            <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/12 text-primary">
+              <LibraryBig className="h-6 w-6" />
             </div>
-            <div className="rounded-2xl border border-border bg-white/70 px-4 py-3">
-              Keep time-capsule playlists and transfer work in separate flows so each journey stays easier to follow.
-            </div>
-            <div className="rounded-2xl border border-border bg-white/70 px-4 py-3">
-              Leave advanced experiments available without letting them crowd the main product entry.
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="animate-fade-up [animation-delay:180ms]">
-          <CardHeader>
             <CardTitle>How it works</CardTitle>
-            <CardDescription>Keep the entry page short, then let the dashboard do the routing and tool switching.</CardDescription>
+            <CardDescription>Keep the first screen simple, then let the dashboard handle the account-specific details.</CardDescription>
           </CardHeader>
           <CardContent className="grid gap-3">
             {steps.map((step, index) => (
@@ -159,6 +188,28 @@ export function LandingPage() {
                   {index + 1}
                 </div>
                 <p className="pt-1 text-sm text-muted-foreground">{step}</p>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+
+        <Card className="animate-fade-up border-white/10 bg-card/88 [animation-delay:180ms]">
+          <CardHeader>
+            <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/12 text-primary">
+              <ShieldCheck className="h-6 w-6" />
+            </div>
+            <CardTitle>Why start here</CardTitle>
+            <CardDescription>
+              This page keeps the first decision simple before you move into playlist building or transfer work.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-3">
+            {trustPoints.map((point) => (
+              <div key={point} className="flex items-start gap-3 rounded-2xl border border-border bg-white/70 px-4 py-4">
+                <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/12 text-primary">
+                  <Check className="h-4 w-4" />
+                </div>
+                <p className="text-sm text-muted-foreground">{point}</p>
               </div>
             ))}
           </CardContent>

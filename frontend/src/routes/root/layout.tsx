@@ -1,10 +1,8 @@
 import { ArrowRight, Disc3, Music2 } from "lucide-react"
 import { Link, Outlet } from "react-router-dom"
 
-import { Button, buttonVariants } from "@/components/ui/button"
+import { Button } from "@/components/ui/button"
 import { useSpotifySession } from "@/features/spotify/use-spotify-session"
-import { getDocsUrl } from "@/lib/api"
-import { cn } from "@/lib/utils"
 
 export function RootLayout() {
   const { handleSpotifyLogin, isAuthenticated } = useSpotifySession()
@@ -22,22 +20,17 @@ export function RootLayout() {
               <Music2 className="h-5 w-5" />
             </div>
             <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-foreground/55">Spotify Time Machine</p>
-              <p className="font-display text-lg">Time-based playlists and clearer library transfers</p>
+              <p className="font-display text-lg text-foreground">Spotify Time Machine</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-foreground/55">Time-based playlists and cleaner transfers</p>
             </div>
           </Link>
 
           <div className="flex items-center gap-2">
-            <a
-              href={getDocsUrl()}
-              target="_blank"
-              rel="noreferrer"
-              className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "hidden sm:inline-flex")}
-            >
-              API Docs
-            </a>
             {isAuthenticated ? (
-              <Link to="/app" className={buttonVariants({ size: "sm" })}>
+              <Link
+                to="/app"
+                className="inline-flex h-9 items-center justify-center gap-2 rounded-full bg-primary px-4 text-xs font-medium text-primary-foreground shadow-glow transition-all hover:bg-primary/90"
+              >
                 Open dashboard
                 <ArrowRight className="h-4 w-4" />
               </Link>
@@ -84,7 +77,7 @@ export function RootLayout() {
           </div>
 
           <div className="space-y-3 text-sm">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-foreground/55">Access</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-foreground/55">Notes</p>
             <div className="grid gap-2 text-muted-foreground">
               <Link to="/" className="transition-colors hover:text-foreground">
                 Homepage
@@ -92,10 +85,8 @@ export function RootLayout() {
               <Link to="/app" className="transition-colors hover:text-foreground">
                 Open dashboard
               </Link>
-              <a href={getDocsUrl()} target="_blank" rel="noreferrer" className="transition-colors hover:text-foreground">
-                API Docs
-              </a>
               <p>Spotify login is required before personal-library tools can load your account data.</p>
+              <p>The public homepage stays focused on the product, and the heavier navigation waits inside the app.</p>
             </div>
           </div>
         </div>
