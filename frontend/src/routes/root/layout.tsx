@@ -1,10 +1,11 @@
 import { Headphones, LayoutGrid, Music2, Orbit, Sparkles } from "lucide-react"
 import { Link, NavLink, Outlet } from "react-router-dom"
 
-import { primaryNavigation } from "@/app/navigation"
 import { buttonVariants } from "@/components/ui/button"
 import { getDocsUrl } from "@/lib/api"
 import { cn } from "@/lib/utils"
+
+import { primaryNavigation } from "./navigation"
 
 export function RootLayout() {
   return (
