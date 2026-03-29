@@ -4,6 +4,7 @@ import { Link } from "react-router-dom"
 import { Badge } from "@/components/ui/badge"
 import { Button, buttonVariants } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { TopTracksRecap } from "@/features/dashboard/top-tracks-recap"
 import { formatExpiresAt, getErrorMessage, useSpotifySession } from "@/features/spotify/use-spotify-session"
 import { getDocsUrl } from "@/lib/api"
 import { cn } from "@/lib/utils"
@@ -13,6 +14,12 @@ export function HomePage() {
 
   return (
     <div className="container space-y-8 py-8 md:py-12">
+      <TopTracksRecap
+        displayName={whoAmIQuery.data?.display_name || whoAmIQuery.data?.id}
+        scope={authStatusQuery.data?.scope}
+        onReconnect={handleSpotifyLogin}
+      />
+
       <section className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
         <div className="section-shell animate-fade-up overflow-hidden">
           <div className="flex flex-wrap items-center gap-3">

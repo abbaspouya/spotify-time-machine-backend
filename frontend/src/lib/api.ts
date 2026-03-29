@@ -13,6 +13,8 @@ import type {
   PlaylistMutationResponse,
   SearchArtistsResponse,
   AsyncJob,
+  TopTracksRequest,
+  TopTracksResponse,
   WhoAmI,
 } from "@/lib/types"
 
@@ -89,6 +91,16 @@ export function getDocsUrl() {
 
 export async function getAuthStatus() {
   return request<AuthStatus>("/auth_status")
+}
+
+export async function getTopTracks(payload: TopTracksRequest) {
+  return request<TopTracksResponse>(
+    `/top_tracks${buildQuery({
+      timeframe: payload.timeframe,
+      days: payload.days,
+      limit: payload.limit ?? 50,
+    })}`,
+  )
 }
 
 export async function getWhoAmI() {

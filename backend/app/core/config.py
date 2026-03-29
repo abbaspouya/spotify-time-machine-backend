@@ -72,7 +72,8 @@ SPOTIFY_SCOPE = (
     "playlist-read-private playlist-read-collaborative "
     "playlist-modify-private playlist-modify-public "
     "user-library-read user-library-modify "
-    "user-follow-read user-follow-modify"
+    "user-follow-read user-follow-modify "
+    "user-top-read user-read-recently-played"
 )
 
 SESSION_COOKIE_NAME = os.getenv("SESSION_COOKIE_NAME", "spotify_time_machine_session")

@@ -5,6 +5,51 @@ export type AuthStatus = {
   token_type?: string | null
 }
 
+export type TopTracksTimeframeKey = "1_week" | "4_weeks" | "6_months" | "lifetime" | "custom"
+
+export type TopTracksRequest = {
+  timeframe: TopTracksTimeframeKey
+  days?: number
+  limit?: number
+}
+
+export type TopTrack = {
+  rank: number
+  id: string | null
+  uri: string | null
+  name: string | null
+  artist_names: string[]
+  album_name: string | null
+  album_image_url: string | null
+  spotify_url: string | null
+  duration_ms: number | null
+  play_count: number | null
+  last_played_at: string | null
+}
+
+export type TopTracksTimeframe = {
+  key: TopTracksTimeframeKey
+  label: string
+  mode: "recent_window" | "spotify_top_items"
+  days?: number | null
+  spotify_time_range?: string | null
+  description: string
+  disclaimer?: string | null
+}
+
+export type TopTracksResponse = {
+  selected_timeframe: TopTracksTimeframe
+  tracks: TopTrack[]
+  track_count: number
+  total_unique_tracks: number
+  scanned_plays: number | null
+  window_start: string | null
+  window_end: string | null
+  is_partial: boolean
+  source_note: string
+  retrieved_at: string | null
+}
+
 export type WhoAmI = {
   id: string
   display_name: string | null
