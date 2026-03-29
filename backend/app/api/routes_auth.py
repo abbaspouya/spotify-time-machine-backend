@@ -119,5 +119,6 @@ def whoami(request: Request):
         "email": me.get("email"),
         "country": me.get("country"),
         "product": me.get("product"),
+        "image_url": me.get("images", [{}])[0].get("url") if me.get("images") else None,
         "profile_url": me.get("external_urls", {}).get("spotify"),
     }

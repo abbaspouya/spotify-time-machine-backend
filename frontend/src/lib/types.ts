@@ -11,6 +11,7 @@ export type WhoAmI = {
   email: string | null
   country: string | null
   product: string | null
+  image_url: string | null
   profile_url: string | null
 }
 
