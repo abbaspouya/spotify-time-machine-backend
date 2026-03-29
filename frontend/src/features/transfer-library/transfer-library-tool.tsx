@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react"
 import type { ChangeEvent, FormEvent } from "react"
-import { AlertTriangle, CheckCircle2, Download, FileUp, LoaderCircle, ShieldAlert } from "lucide-react"
+import { AlertTriangle, ArrowRight, CheckCircle2, Download, FileUp, LoaderCircle, ShieldAlert } from "lucide-react"
 import { useMutation } from "@tanstack/react-query"
 
 import { previewSnapshotImport, startExportSnapshotJob, startImportSnapshotJob } from "@/lib/api"
@@ -17,11 +17,12 @@ import { AuthRequiredNotice } from "@/features/spotify/auth-required-notice"
 import { JobStatusCard } from "@/features/jobs/job-status-card"
 import { isActiveJobStatus, useAsyncJob } from "@/features/jobs/use-async-job"
 import { getErrorMessage, useSpotifySession } from "@/features/spotify/use-spotify-session"
+import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { cn } from "@/lib/utils"
 
 const exportToggleFields = [
   { label: "Include playlists", key: "includePlaylists" },
@@ -115,6 +116,10 @@ function downloadSnapshotFile(snapshot: SnapshotDocument, fileName: string) {
   link.click()
   document.body.removeChild(link)
   URL.revokeObjectURL(objectUrl)
+}
+
+function snapshotDocumentToFile(snapshot: SnapshotDocument, fileName: string) {
+  return new File([JSON.stringify(snapshot, null, 2)], fileName, { type: "application/json" })
 }
 
 function formatDateTime(value?: string | null) {
@@ -481,16 +486,44 @@ export function TransferLibraryTool() {
 
   const previewRequiresConfirmation = Boolean(previewData?.requires_confirmation)
   const canStartImport = Boolean(previewData) && (!previewRequiresConfirmation || importConfirmationChecked) && !isImporting
+  const snapshotReady = Boolean(snapshotFile || exportResult)
+
+  const transferFlowSteps = [
+    {
+      label: "Prepare snapshot",
+      state: snapshotReady ? "done" : "current",
+    },
+    {
+      label: "Preview import plan",
+      state: previewData ? "done" : snapshotReady ? "current" : "pending",
+    },
+    {
+      label: "Apply transfer",
+      state: importResult ? "done" : previewData ? "current" : "pending",
+    },
+  ] as const
+
+  const handleUseExportForImport = () => {
+    if (!exportResult?.snapshot) {
+      return
+    }
+
+    const nextFile = snapshotDocumentToFile(exportResult.snapshot, exportResult.downloaded_file_name)
+    setSnapshotFile(nextFile)
+    resetImportWorkflow()
+  }
 
   const exportCard = (
-    <Card className="animate-fade-up [animation-delay:180ms]">
-      <CardHeader>
-        <CardTitle>Download a snapshot file</CardTitle>
-        <CardDescription>
-          Choose what to include, start the export in the background, and download the snapshot as soon as it is ready.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-5">
+    <div className="rounded-[30px] border border-white/10 bg-white/5 p-5 shadow-panel">
+      <div className="space-y-2">
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-foreground/55">Step 1</p>
+        <h3 className="text-2xl font-semibold">Prepare snapshot file</h3>
+        <p className="text-sm text-muted-foreground">
+          Export a fresh snapshot from the source account. If you already have a snapshot JSON, you can skip straight
+          to the import station.
+        </p>
+      </div>
+      <div className="mt-6 space-y-5">
         {!isAuthenticated ? (
           <AuthRequiredNotice message="Connect Spotify first to export a snapshot from the current account." />
         ) : null}
@@ -594,26 +627,32 @@ export function TransferLibraryTool() {
             </div>
 
             <div className="flex flex-wrap gap-3">
-              <Button onClick={handleDownloadAgain} variant="secondary">
+              <Button onClick={handleUseExportForImport} variant="secondary">
+                <ArrowRight className="h-4 w-4" />
+                Send to import
+              </Button>
+              <Button onClick={handleDownloadAgain} variant="outline">
                 <Download className="h-4 w-4" />
                 Download again
               </Button>
             </div>
           </div>
         ) : null}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   )
 
   const importCard = (
-    <Card className="animate-fade-up [animation-delay:220ms]">
-      <CardHeader>
-        <CardTitle>Upload a snapshot file</CardTitle>
-        <CardDescription>
-          Preview the exact import plan first, acknowledge destructive changes when needed, and then run the import in the background.
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-5">
+    <div className="rounded-[30px] border border-white/10 bg-white/5 p-5 shadow-panel">
+      <div className="space-y-2">
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-foreground/55">Steps 2 and 3</p>
+        <h3 className="text-2xl font-semibold">Preview and apply snapshot</h3>
+        <p className="text-sm text-muted-foreground">
+          Upload the snapshot, review the exact import plan, confirm destructive operations when needed, and then run
+          the transfer in the background.
+        </p>
+      </div>
+      <div className="mt-6 space-y-5">
         {!isAuthenticated ? (
           <AuthRequiredNotice message="Connect Spotify first to apply a snapshot into the active account." />
         ) : null}
@@ -624,7 +663,7 @@ export function TransferLibraryTool() {
           <p className="mt-1 text-sm text-muted-foreground">
             {snapshotFile
               ? `${formatFileSize(snapshotFile.size)} - ready for preview`
-              : "Choose a JSON snapshot file exported from Spotify Time Machine."}
+              : "Choose a JSON snapshot file exported from Spotify Time Machine or send one over from step 1."}
           </p>
         </div>
 
@@ -812,14 +851,70 @@ export function TransferLibraryTool() {
             <PlaylistList playlists={importResult.result.created_playlists} />
           </div>
         ) : null}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   )
 
   return (
-    <section id="transfer-tools" className="grid gap-6 xl:grid-cols-2">
-      {exportCard}
-      {importCard}
+    <section id="transfer-tools" className="section-shell animate-fade-up overflow-hidden">
+      <div className="flex flex-wrap items-center gap-3">
+        <span className="hero-badge">One connected workflow</span>
+        <Badge variant={importResult ? "default" : snapshotReady ? "secondary" : "outline"}>
+          {importResult ? "Transfer applied" : snapshotReady ? "Snapshot ready" : "Prepare a snapshot"}
+        </Badge>
+      </div>
+
+      <div className="mt-6 space-y-4">
+        <h2 className="max-w-3xl text-3xl leading-tight md:text-4xl">Prepare the snapshot, review the plan, then apply the transfer.</h2>
+        <p className="max-w-3xl text-base text-muted-foreground md:text-lg">
+          Use a fresh export from the source account or bring a snapshot you already downloaded. Then preview the exact
+          changes before the import starts touching the target account.
+        </p>
+      </div>
+
+      <div className="mt-8 flex items-center gap-3 overflow-x-auto pb-2">
+        {transferFlowSteps.map((step, index) => (
+          <div key={step.label} className="flex items-center gap-3">
+            <div
+              className={cn(
+                "flex min-w-fit items-center gap-2 rounded-full border px-3 py-2 text-sm font-medium whitespace-nowrap transition-colors",
+                step.state === "done"
+                  ? "border-primary/30 bg-primary/12 text-primary"
+                  : step.state === "current"
+                    ? "border-white/15 bg-white/8 text-foreground"
+                    : "border-white/10 bg-transparent text-foreground/55",
+              )}
+            >
+              <span
+                className={cn(
+                  "flex h-6 w-6 items-center justify-center rounded-full text-xs font-semibold",
+                  step.state === "done"
+                    ? "bg-primary text-primary-foreground"
+                    : step.state === "current"
+                      ? "bg-white/10 text-foreground"
+                      : "bg-white/5 text-foreground/60",
+                )}
+              >
+                {index + 1}
+              </span>
+              {step.label}
+            </div>
+            {index < transferFlowSteps.length - 1 ? <div className="h-px w-10 shrink-0 bg-gradient-to-r from-primary/35 to-white/10" /> : null}
+          </div>
+        ))}
+      </div>
+
+      <div className="relative mt-8 grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
+        <div className="pointer-events-none absolute bottom-10 left-1/2 top-10 hidden w-px -translate-x-1/2 bg-gradient-to-b from-primary/0 via-primary/25 to-primary/0 xl:block" />
+        <div className="pointer-events-none absolute left-1/2 top-1/2 hidden -translate-x-1/2 -translate-y-1/2 xl:block">
+          <div className="flex h-12 w-12 items-center justify-center rounded-full border border-primary/25 bg-background/95 text-primary shadow-panel">
+            <ArrowRight className="h-5 w-5" />
+          </div>
+        </div>
+
+        {exportCard}
+        {importCard}
+      </div>
     </section>
   )
 }
