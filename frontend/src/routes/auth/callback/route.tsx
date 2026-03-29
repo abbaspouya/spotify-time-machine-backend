@@ -23,7 +23,7 @@ export function AuthCallbackPage() {
     ])
 
     const timeout = window.setTimeout(() => {
-      navigate("/", { replace: true })
+      navigate(isSuccess ? "/app" : "/", { replace: true })
     }, isSuccess ? 1400 : 2800)
 
     return () => window.clearTimeout(timeout)
@@ -51,10 +51,10 @@ export function AuthCallbackPage() {
         <CardContent className="flex flex-col gap-4">
           <div className="rounded-2xl border border-border bg-muted/55 px-4 py-3 text-sm text-muted-foreground">
             <LoaderCircle className="mr-2 inline h-4 w-4 animate-spin" />
-            Redirecting back to the app now.
+            {isSuccess ? "Redirecting into the dashboard now." : "Redirecting back to the homepage now."}
           </div>
-          <Link to="/" className={cn(buttonVariants({ variant: "outline" }), "w-fit")}>
-            Return now
+          <Link to={isSuccess ? "/app" : "/"} className={cn(buttonVariants({ variant: "outline" }), "w-fit")}>
+            {isSuccess ? "Open dashboard now" : "Return to homepage"}
           </Link>
         </CardContent>
       </Card>

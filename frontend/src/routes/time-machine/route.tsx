@@ -13,8 +13,8 @@ const features = [
 ]
 
 const currentLinks = [
-  { to: "/", label: "Open Home" },
-  { to: "/transfer-library", label: "Open transfer flow" },
+  { to: "/app", label: "Open dashboard" },
+  { to: "/app/transfer-library", label: "Open transfer flow" },
 ]
 
 export function TimeMachinePage() {
@@ -36,8 +36,8 @@ export function TimeMachinePage() {
           </div>
 
           <div className="mt-8 flex flex-wrap gap-3">
-            <Link to="/" className={buttonVariants({ variant: "default" })}>
-              Open Home
+            <Link to="/app" className={buttonVariants({ variant: "default" })}>
+              Open dashboard
             </Link>
             <a href="#time-machine-tool" className={buttonVariants({ variant: "outline" })}>
               Jump to builder
@@ -67,7 +67,7 @@ export function TimeMachinePage() {
         <Card className="animate-fade-up [animation-delay:180ms]">
           <CardHeader>
             <CardTitle>Useful next steps</CardTitle>
-            <CardDescription>Move between connection, playlist building, and library transfer without losing context.</CardDescription>
+            <CardDescription>Move between the dashboard, playlist building, and library transfer without losing context.</CardDescription>
           </CardHeader>
           <CardContent className="flex flex-wrap gap-3">
             {currentLinks.map((link) => (

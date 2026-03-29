@@ -16,7 +16,7 @@ export function HomePage() {
       <section className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
         <div className="section-shell animate-fade-up overflow-hidden">
           <div className="flex flex-wrap items-center gap-3">
-            <span className="hero-badge">Home</span>
+            <span className="hero-badge">Dashboard</span>
             <Badge variant={isAuthenticated ? "default" : "outline"}>
               {isAuthenticated ? "Spotify connected" : "Spotify not connected"}
             </Badge>
@@ -24,26 +24,32 @@ export function HomePage() {
 
           <div className="mt-6 space-y-4">
             <h1 className="max-w-3xl text-4xl leading-tight md:text-5xl">
-              Start here, connect Spotify, and jump into the flow you need.
+              Choose the Spotify flow you want without crowding the landing page.
             </h1>
             <p className="max-w-2xl text-base text-muted-foreground md:text-lg">
-              Home now doubles as your connection page and quick launcher, so you can verify the active account and
-              move straight into playlist creation, transfers, or experiments.
+              Confirm the active account, refresh the session when needed, and move into playlists, transfers, or
+              advanced tools from one focused dashboard.
             </p>
           </div>
 
           <div className="mt-8 flex flex-wrap gap-3">
-            <Button onClick={handleSpotifyLogin}>
-              <Disc3 className="h-4 w-4" />
-              Connect Spotify
-            </Button>
+            {isAuthenticated ? (
+              <Link to="/app/time-machine" className={buttonVariants({ variant: "default" })}>
+                Open Time Machine
+                <ArrowRight className="h-4 w-4" />
+              </Link>
+            ) : (
+              <Button onClick={handleSpotifyLogin}>
+                <Disc3 className="h-4 w-4" />
+                Connect Spotify
+              </Button>
+            )}
             <Button variant="outline" onClick={() => void refreshSession()}>
               <RefreshCcw className="h-4 w-4" />
               Refresh status
             </Button>
-            <Link to="/time-machine" className={cn(buttonVariants({ variant: "ghost" }), "bg-white/60")}>
-              Explore the main journey
-              <ArrowRight className="h-4 w-4" />
+            <Link to="/" className={cn(buttonVariants({ variant: "ghost" }), "bg-white/60")}>
+              View homepage
             </Link>
           </div>
         </div>
@@ -55,7 +61,7 @@ export function HomePage() {
             </div>
             <CardTitle>Current session</CardTitle>
             <CardDescription>
-              Use Home as the quick place to confirm which account is active, refresh the session, and launch the next page.
+              Confirm which account is active, refresh the session, and launch the next flow from the dashboard.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -89,7 +95,7 @@ export function HomePage() {
             ) : null}
 
             <div className="flex flex-wrap gap-3">
-              <Link to="/time-machine" className={buttonVariants({ variant: "secondary" })}>
+              <Link to="/app/time-machine" className={buttonVariants({ variant: "secondary" })}>
                 Open Time Machine
               </Link>
               <a
@@ -116,7 +122,7 @@ export function HomePage() {
           </CardHeader>
           <CardContent className="space-y-4 text-sm text-muted-foreground">
             <p>Browse your listening history by time period and turn those slices into playlists.</p>
-            <Link to="/time-machine" className={buttonVariants({ variant: "secondary" })}>
+            <Link to="/app/time-machine" className={buttonVariants({ variant: "secondary" })}>
               Open Time Machine
               <ArrowRight className="h-4 w-4" />
             </Link>
@@ -133,7 +139,7 @@ export function HomePage() {
           </CardHeader>
           <CardContent className="space-y-4 text-sm text-muted-foreground">
             <p>Download a snapshot, upload it into another account, and keep track of what was applied.</p>
-            <Link to="/transfer-library" className={buttonVariants({ variant: "secondary" })}>
+            <Link to="/app/transfer-library" className={buttonVariants({ variant: "secondary" })}>
               Open Transfer Library
               <ArrowRight className="h-4 w-4" />
             </Link>
@@ -150,7 +156,7 @@ export function HomePage() {
           </CardHeader>
           <CardContent className="space-y-4 text-sm text-muted-foreground">
             <p>Explore language grouping and artist search without interrupting the main flows.</p>
-            <Link to="/advanced" className={buttonVariants({ variant: "secondary" })}>
+            <Link to="/app/advanced" className={buttonVariants({ variant: "secondary" })}>
               Open Advanced
               <ArrowRight className="h-4 w-4" />
             </Link>

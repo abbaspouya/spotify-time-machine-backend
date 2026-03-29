@@ -31,8 +31,8 @@ export function TransferLibraryPage() {
           </div>
 
           <div className="mt-8 flex flex-wrap gap-3">
-            <Link to="/" className={buttonVariants({ variant: "default" })}>
-              Open Home first
+            <Link to="/app" className={buttonVariants({ variant: "default" })}>
+              Open dashboard
             </Link>
             <a href="#transfer-tools" className={buttonVariants({ variant: "outline" })}>
               Jump to transfer tools
@@ -62,14 +62,14 @@ export function TransferLibraryPage() {
         <Card className="animate-fade-up [animation-delay:180ms]">
           <CardHeader>
             <CardTitle>Related pages</CardTitle>
-            <CardDescription>Jump to Home or advanced tools when you need them, then come right back to the transfer flow.</CardDescription>
+            <CardDescription>Jump to the dashboard or advanced tools when you need them, then come right back to the transfer flow.</CardDescription>
           </CardHeader>
           <CardContent className="flex flex-wrap gap-3">
-            <Link to="/" className={buttonVariants({ variant: "secondary" })}>
+            <Link to="/app" className={buttonVariants({ variant: "secondary" })}>
               <Download className="h-4 w-4" />
-              Home
+              Dashboard
             </Link>
-            <Link to="/advanced" className={buttonVariants({ variant: "outline" })}>
+            <Link to="/app/advanced" className={buttonVariants({ variant: "outline" })}>
               <Upload className="h-4 w-4" />
               Advanced tools
             </Link>
