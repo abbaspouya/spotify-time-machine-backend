@@ -1,11 +1,11 @@
 import { Navigate, createBrowserRouter } from "react-router-dom"
 
-import { AdvancedPage } from "@/pages/advanced-page"
-import { AuthCallbackPage } from "@/pages/auth-callback-page"
-import { HomePage } from "@/pages/home-page"
-import { RootLayout } from "@/pages/root-layout"
-import { TimeMachinePage } from "@/pages/time-machine-page"
-import { TransferLibraryPage } from "@/pages/transfer-library-page"
+import { AdvancedPage } from "@/routes/advanced/route"
+import { AuthCallbackPage } from "@/routes/auth/callback/route"
+import { HomePage } from "@/routes/home/route"
+import { RootLayout } from "@/routes/root/layout"
+import { TimeMachinePage } from "@/routes/time-machine/route"
+import { TransferLibraryPage } from "@/routes/transfer-library/route"
 
 export const router = createBrowserRouter([
   {
