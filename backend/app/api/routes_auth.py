@@ -3,7 +3,13 @@ from fastapi.responses import JSONResponse, RedirectResponse
 
 from ..core.auth import get_oauth_for_session, get_spotify_client
 from ..core.observability import get_logger
-from ..core.session_store import ensure_session_id, get_session_id_from_request, set_session_cookie
+from ..core.session_store import (
+    clear_session_cookie,
+    delete_session,
+    ensure_session_id,
+    get_session_id_from_request,
+    set_session_cookie,
+)
 from .helpers import build_auth_status_response, build_frontend_redirect
 
 router = APIRouter(tags=["Authentication"])
@@ -83,6 +89,17 @@ def callback(request: Request):
 @router.get("/auth_status", summary="Check current auth state")
 def auth_status(request: Request):
     return build_auth_status_response(request)
+
+
+@router.post("/logout", summary="Clear current Spotify session")
+def logout(request: Request):
+    session_id = get_session_id_from_request(request)
+    if session_id:
+        delete_session(session_id)
+
+    response = JSONResponse({"authenticated": False})
+    clear_session_cookie(response)
+    return response
 
 
 @router.get("/get_token", deprecated=True, summary="Check auth state (legacy)", include_in_schema=False)

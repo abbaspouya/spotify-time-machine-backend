@@ -95,6 +95,12 @@ export async function getWhoAmI() {
   return request<WhoAmI>("/whoami")
 }
 
+export async function logoutSpotify() {
+  return request<{ authenticated: false }>("/logout", {
+    method: "POST",
+  })
+}
+
 export async function getGroupedSongs(filters: GroupFilters) {
   return request<GroupedSongsResponse>(
     `/fetch_and_group${buildQuery({

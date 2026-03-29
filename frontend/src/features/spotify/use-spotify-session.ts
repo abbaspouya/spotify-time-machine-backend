@@ -1,6 +1,6 @@
-import { useQuery, useQueryClient } from "@tanstack/react-query"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
-import { getAuthStatus, getLoginUrl, getWhoAmI } from "@/lib/api"
+import { getAuthStatus, getLoginUrl, getWhoAmI, logoutSpotify } from "@/lib/api"
 
 export function formatExpiresAt(value?: number | null) {
   if (!value) {
@@ -34,6 +34,15 @@ export function useSpotifySession() {
     window.location.href = getLoginUrl()
   }
 
+  const logoutMutation = useMutation({
+    mutationFn: logoutSpotify,
+    onSuccess: async () => {
+      queryClient.setQueryData(["authStatus"], { authenticated: false })
+      queryClient.removeQueries({ queryKey: ["whoami"] })
+      await queryClient.invalidateQueries({ queryKey: ["authStatus"] })
+    },
+  })
+
   const refreshSession = async () => {
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: ["authStatus"] }),
@@ -46,6 +55,8 @@ export function useSpotifySession() {
     isAuthenticated,
     whoAmIQuery,
     handleSpotifyLogin,
+    handleSpotifyLogout: logoutMutation.mutateAsync,
+    isLoggingOut: logoutMutation.isPending,
     refreshSession,
   }
 }

@@ -1,12 +1,30 @@
-import { LayoutDashboard, Music2 } from "lucide-react"
-import { Link, NavLink, Outlet } from "react-router-dom"
+import { LayoutDashboard, LoaderCircle, LogOut, Music2 } from "lucide-react"
+import { Link, NavLink, Navigate, Outlet } from "react-router-dom"
 
-import { buttonVariants } from "@/components/ui/button"
+import { Button, buttonVariants } from "@/components/ui/button"
+import { useSpotifySession } from "@/features/spotify/use-spotify-session"
 import { cn } from "@/lib/utils"
 
 import { primaryNavigation } from "../root/navigation"
 
 export function AppLayout() {
+  const { authStatusQuery, handleSpotifyLogout, isAuthenticated, isLoggingOut } = useSpotifySession()
+
+  if (authStatusQuery.isPending) {
+    return (
+      <div className="container flex min-h-screen items-center justify-center py-12">
+        <div className="flex items-center gap-3 rounded-full border border-white/10 bg-card/85 px-5 py-3 text-sm text-muted-foreground">
+          <LoaderCircle className="h-4 w-4 animate-spin" />
+          Checking your Spotify session...
+        </div>
+      </div>
+    )
+  }
+
+  if (!isAuthenticated) {
+    return <Navigate to="/" replace />
+  }
+
   return (
     <div className="relative isolate min-h-screen overflow-hidden">
       <div className="pointer-events-none absolute inset-x-0 top-[-16rem] z-0 h-[30rem] bg-[radial-gradient(circle,_rgba(29,185,84,0.24),_transparent_58%)]" />
@@ -53,6 +71,10 @@ export function AppLayout() {
               <Link to="/" className={buttonVariants({ variant: "ghost", size: "sm" })}>
                 View homepage
               </Link>
+              <Button variant="outline" size="sm" disabled={isLoggingOut} onClick={() => void handleSpotifyLogout()}>
+                {isLoggingOut ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <LogOut className="h-4 w-4" />}
+                Log out
+              </Button>
             </div>
           </div>
         </div>

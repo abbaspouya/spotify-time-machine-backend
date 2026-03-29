@@ -10,6 +10,7 @@ os.environ.setdefault("SPOTIFY_REDIRECT_URI", "http://127.0.0.1:8000/callback")
 os.environ.setdefault("FRONTEND_URL", "http://127.0.0.1:5173")
 
 from backend.app.main import app
+from backend.app.core.config import SESSION_COOKIE_NAME
 
 
 class ApiContractTests(unittest.TestCase):
@@ -49,6 +50,24 @@ class ApiContractTests(unittest.TestCase):
         paths = response.json()["paths"]
         self.assertNotIn("/callback", paths)
         self.assertNotIn("/get_token", paths)
+
+    def test_logout_clears_session_cookie(self):
+        with TestClient(app) as client:
+            login_response = client.get("/login", params={"raw": True})
+
+            self.assertEqual(login_response.status_code, 200)
+            self.assertIn(SESSION_COOKIE_NAME, client.cookies)
+
+            logout_response = client.post("/logout")
+
+            self.assertEqual(logout_response.status_code, 200)
+            self.assertEqual(logout_response.json(), {"authenticated": False})
+            self.assertNotIn(SESSION_COOKIE_NAME, client.cookies)
+
+            auth_status_response = client.get("/auth_status")
+
+            self.assertEqual(auth_status_response.status_code, 200)
+            self.assertEqual(auth_status_response.json(), {"authenticated": False})
 
 
 if __name__ == "__main__":
