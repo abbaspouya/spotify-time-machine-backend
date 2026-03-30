@@ -71,6 +71,7 @@ CORS_ALLOW_ORIGINS = list(dict.fromkeys(_parse_csv_env("CORS_ALLOW_ORIGINS", _de
 SPOTIFY_SCOPE = (
     "playlist-read-private playlist-read-collaborative "
     "playlist-modify-private playlist-modify-public "
+    "user-read-private user-read-email "
     "user-library-read user-library-modify "
     "user-follow-read user-follow-modify "
     "user-top-read user-read-recently-played"
