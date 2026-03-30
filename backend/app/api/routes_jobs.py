@@ -1,7 +1,7 @@
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Query, Request
 from spotipy.exceptions import SpotifyException
 
-from ..core.auth import get_spotify_client_for_session
+from ..core.auth import DEFAULT_ACCOUNT_ROLE, get_spotify_client_for_session, normalize_account_role
 from ..core.jobs import create_job, get_job
 from ..core.session_store import get_session_id_from_request
 from ..schemas.account_snapshot import ExportAccountSnapshotRequest, ImportAccountSnapshotRequest
@@ -68,13 +68,18 @@ def get_job_status(job_id: str, request: Request):
 
 
 @router.post("/jobs/fetch_and_group", summary="Start grouped songs job")
-def start_fetch_and_group_job(request: Request, payload: GroupSongsJobRequest):
+def start_fetch_and_group_job(
+    request: Request,
+    payload: GroupSongsJobRequest,
+    account_role: str = Query(DEFAULT_ACCOUNT_ROLE, description="Spotify account slot: source or target."),
+):
     session_id = _require_session_id(request)
+    normalized_role = normalize_account_role(account_role)
 
     def worker(progress):
         try:
             progress(10, "Loading liked songs from Spotify")
-            sp = get_spotify_client_for_session(session_id)
+            sp = get_spotify_client_for_session(session_id, normalized_role)
             songs = fetch_all_liked_songs(sp)
             progress(80, f"Grouping {len(songs)} liked songs by time period")
             groups = group_songs_by_period(
@@ -96,13 +101,17 @@ def start_fetch_and_group_job(request: Request, payload: GroupSongsJobRequest):
 
 
 @router.post("/jobs/group_by_language", summary="Start language grouping job (beta)")
-def start_group_by_language_job(request: Request):
+def start_group_by_language_job(
+    request: Request,
+    account_role: str = Query(DEFAULT_ACCOUNT_ROLE, description="Spotify account slot: source or target."),
+):
     session_id = _require_session_id(request)
+    normalized_role = normalize_account_role(account_role)
 
     def worker(progress):
         try:
             progress(10, "Loading liked songs from Spotify")
-            sp = get_spotify_client_for_session(session_id)
+            sp = get_spotify_client_for_session(session_id, normalized_role)
             songs = fetch_all_liked_songs(sp)
             progress(75, f"Detecting languages across {len(songs)} liked songs")
             groups = group_songs_by_language(songs)
@@ -115,11 +124,16 @@ def start_group_by_language_job(request: Request):
 
 
 @router.post("/jobs/export_account_snapshot", summary="Start snapshot export job")
-def start_export_account_snapshot_job(request: Request, payload: ExportAccountSnapshotRequest):
+def start_export_account_snapshot_job(
+    request: Request,
+    payload: ExportAccountSnapshotRequest,
+    account_role: str = Query(DEFAULT_ACCOUNT_ROLE, description="Spotify account slot: source or target."),
+):
     session_id = _require_session_id(request)
+    normalized_role = normalize_account_role(account_role)
 
     def worker(progress):
-        sp = get_spotify_client_for_session(session_id)
+        sp = get_spotify_client_for_session(session_id, normalized_role)
 
         try:
             snapshot = export_account_snapshot(
@@ -149,6 +163,8 @@ def start_export_account_snapshot_job(request: Request, payload: ExportAccountSn
             "file_path": file_path,
             "counts": snapshot.get("counts", {}),
             "source_user_id": snapshot.get("source_user_id"),
+            "source_account": snapshot.get("source_account"),
+            "warnings": snapshot.get("warnings", []),
             "exported_at": snapshot.get("exported_at"),
             "cutoff_date": snapshot.get("cutoff_date"),
         }
@@ -162,12 +178,17 @@ def start_export_account_snapshot_job(request: Request, payload: ExportAccountSn
 
 
 @router.post("/jobs/import_account_snapshot", summary="Start snapshot import job")
-def start_import_account_snapshot_job(request: Request, payload: ImportAccountSnapshotRequest):
+def start_import_account_snapshot_job(
+    request: Request,
+    payload: ImportAccountSnapshotRequest,
+    account_role: str = Query(DEFAULT_ACCOUNT_ROLE, description="Spotify account slot: source or target."),
+):
     session_id = _require_session_id(request)
     snapshot = _load_snapshot_from_payload(payload)
+    normalized_role = normalize_account_role(account_role)
 
     def worker(progress):
-        sp = get_spotify_client_for_session(session_id)
+        sp = get_spotify_client_for_session(session_id, normalized_role)
         try:
             result = import_account_snapshot(
                 sp=sp,

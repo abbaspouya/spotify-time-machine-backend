@@ -1,5 +1,5 @@
-from fastapi import APIRouter, HTTPException, Request
-from ..core.auth import get_spotify_client
+from fastapi import APIRouter, HTTPException, Query, Request
+from ..core.auth import DEFAULT_ACCOUNT_ROLE, get_spotify_client, normalize_account_role
 from ..schemas.account_snapshot import (
     ExportAccountSnapshotRequest,
     ImportAccountSnapshotRequest,
@@ -16,8 +16,12 @@ router = APIRouter(tags=["Snapshots"])
 
 
 @router.post("/export_account_snapshot", summary="Export account snapshot")
-def export_account_snapshot_endpoint(request: Request, payload: ExportAccountSnapshotRequest):
-    sp = get_spotify_client(request)
+def export_account_snapshot_endpoint(
+    request: Request,
+    payload: ExportAccountSnapshotRequest,
+    account_role: str = Query(DEFAULT_ACCOUNT_ROLE, description="Spotify account slot: source or target."),
+):
+    sp = get_spotify_client(request, normalize_account_role(account_role))
 
     try:
         snapshot = export_account_snapshot(
@@ -43,6 +47,8 @@ def export_account_snapshot_endpoint(request: Request, payload: ExportAccountSna
         "file_path": file_path,
         "counts": snapshot.get("counts", {}),
         "source_user_id": snapshot.get("source_user_id"),
+        "source_account": snapshot.get("source_account"),
+        "warnings": snapshot.get("warnings", []),
         "exported_at": snapshot.get("exported_at"),
         "cutoff_date": snapshot.get("cutoff_date"),
     }
@@ -54,7 +60,11 @@ def export_account_snapshot_endpoint(request: Request, payload: ExportAccountSna
 
 
 @router.post("/import_account_snapshot", summary="Import account snapshot")
-def import_account_snapshot_endpoint(request: Request, payload: ImportAccountSnapshotRequest):
+def import_account_snapshot_endpoint(
+    request: Request,
+    payload: ImportAccountSnapshotRequest,
+    account_role: str = Query(DEFAULT_ACCOUNT_ROLE, description="Spotify account slot: source or target."),
+):
     if not payload.file_path and payload.snapshot is None:
         raise HTTPException(
             status_code=400,
@@ -77,7 +87,7 @@ def import_account_snapshot_endpoint(request: Request, payload: ImportAccountSna
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
 
-    sp = get_spotify_client(request)
+    sp = get_spotify_client(request, normalize_account_role(account_role))
     result = import_account_snapshot(
         sp=sp,
         snapshot=snapshot,
@@ -96,7 +106,11 @@ def import_account_snapshot_endpoint(request: Request, payload: ImportAccountSna
 
 
 @router.post("/preview_account_snapshot_import", summary="Preview account snapshot import")
-def preview_account_snapshot_import_endpoint(request: Request, payload: ImportAccountSnapshotRequest):
+def preview_account_snapshot_import_endpoint(
+    request: Request,
+    payload: ImportAccountSnapshotRequest,
+    account_role: str = Query(DEFAULT_ACCOUNT_ROLE, description="Spotify account slot: source or target."),
+):
     if not payload.file_path and payload.snapshot is None:
         raise HTTPException(
             status_code=400,
@@ -119,7 +133,7 @@ def preview_account_snapshot_import_endpoint(request: Request, payload: ImportAc
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
 
-    sp = get_spotify_client(request)
+    sp = get_spotify_client(request, normalize_account_role(account_role))
     preview = preview_account_snapshot_import(
         sp=sp,
         snapshot=snapshot,

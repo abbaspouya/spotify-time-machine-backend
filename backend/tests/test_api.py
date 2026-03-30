@@ -1,5 +1,6 @@
 import os
 import unittest
+from time import time
 
 from fastapi.testclient import TestClient
 
@@ -10,7 +11,8 @@ os.environ.setdefault("SPOTIFY_REDIRECT_URI", "http://127.0.0.1:8000/callback")
 os.environ.setdefault("FRONTEND_URL", "http://127.0.0.1:5173")
 
 from backend.app.main import app
-from backend.app.core.config import SESSION_COOKIE_NAME
+from backend.app.core.config import SESSION_COOKIE_NAME, SPOTIFY_SCOPE
+from backend.app.core.session_store import save_token_info
 
 
 class ApiContractTests(unittest.TestCase):
@@ -68,6 +70,45 @@ class ApiContractTests(unittest.TestCase):
 
             self.assertEqual(auth_status_response.status_code, 200)
             self.assertEqual(auth_status_response.json(), {"authenticated": False})
+
+    def test_role_specific_auth_status_and_logout_preserve_other_account(self):
+        with TestClient(app) as client:
+            login_response = client.get("/login", params={"raw": True})
+
+            self.assertEqual(login_response.status_code, 200)
+            session_id = client.cookies.get(SESSION_COOKIE_NAME)
+            self.assertIsNotNone(session_id)
+
+            token_info = {
+                "access_token": "test-access-token",
+                "token_type": "Bearer",
+                "scope": SPOTIFY_SCOPE,
+                "expires_at": int(time()) + 3600,
+            }
+            save_token_info(session_id, token_info, "source")
+            save_token_info(session_id, token_info, "target")
+
+            source_status = client.get("/auth_status", params={"account_role": "source"})
+            target_status = client.get("/auth_status", params={"account_role": "target"})
+
+            self.assertEqual(source_status.status_code, 200)
+            self.assertTrue(source_status.json()["authenticated"])
+            self.assertEqual(target_status.status_code, 200)
+            self.assertTrue(target_status.json()["authenticated"])
+
+            logout_target = client.post("/logout", params={"account_role": "target"})
+
+            self.assertEqual(logout_target.status_code, 200)
+            self.assertEqual(logout_target.json(), {"authenticated": False})
+            self.assertIn(SESSION_COOKIE_NAME, client.cookies)
+
+            target_status_after_logout = client.get("/auth_status", params={"account_role": "target"})
+            source_status_after_logout = client.get("/auth_status", params={"account_role": "source"})
+
+            self.assertEqual(target_status_after_logout.status_code, 200)
+            self.assertEqual(target_status_after_logout.json(), {"authenticated": False})
+            self.assertEqual(source_status_after_logout.status_code, 200)
+            self.assertTrue(source_status_after_logout.json()["authenticated"])
 
 
 if __name__ == "__main__":

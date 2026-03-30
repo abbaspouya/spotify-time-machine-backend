@@ -1,17 +1,18 @@
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import type { ChangeEvent, FormEvent } from "react"
-import { AlertTriangle, ArrowRight, CheckCircle2, Download, FileUp, LoaderCircle, ShieldAlert } from "lucide-react"
+import { AlertTriangle, ArrowRight, CheckCircle2, Download, ExternalLink, FileUp, LoaderCircle, LogOut, RefreshCw, ShieldAlert } from "lucide-react"
 import { useMutation } from "@tanstack/react-query"
 
 import { previewSnapshotImport, startExportSnapshotJob, startImportSnapshotJob } from "@/lib/api"
 import type {
   ExportSnapshotResponse,
   ImportedPlaylistSummary,
-  SnapshotImportPreviewResponse,
   ImportSnapshotResponse,
   ImportSnapshotSummary,
   SnapshotCounts,
   SnapshotDocument,
+  SnapshotImportPreviewResponse,
+  SpotifyAccountIdentity,
 } from "@/lib/types"
 import { AuthRequiredNotice } from "@/features/spotify/auth-required-notice"
 import { JobStatusCard } from "@/features/jobs/job-status-card"
@@ -82,6 +83,10 @@ type PreviewSnapshotResult = {
 
 type UploadedImportResponse = ImportSnapshotResponse & {
   imported_file_name: string
+}
+
+type AccountCardIdentity = Partial<SpotifyAccountIdentity> & {
+  email?: string | null
 }
 
 function sanitizeFileName(value: string) {
@@ -158,6 +163,107 @@ async function readSnapshotDocument(file: File): Promise<SnapshotDocument> {
   }
 
   return parsed as SnapshotDocument
+}
+
+function getAccountDisplayName(account?: AccountCardIdentity | null) {
+  return account?.display_name || account?.id || "Unknown Spotify account"
+}
+
+function getAccountInitials(account?: AccountCardIdentity | null) {
+  const source = (account?.display_name || account?.id || "").trim()
+  if (!source) {
+    return "ST"
+  }
+
+  const parts = source.split(/\s+/).filter(Boolean)
+  const initials = parts.slice(0, 2).map((part) => part[0]?.toUpperCase() || "").join("")
+  return initials || source.slice(0, 2).toUpperCase()
+}
+
+function getAccountMeta(account?: AccountCardIdentity | null) {
+  const items = [account?.id, account?.email, account?.country, account?.product].filter(Boolean)
+  return items.length ? items.join(" - ") : "Spotify account"
+}
+
+function extractSnapshotSourceAccount(snapshot?: SnapshotDocument | null): SpotifyAccountIdentity | null {
+  if (!snapshot) {
+    return null
+  }
+
+  const rawAccount = snapshot.source_account
+  if (rawAccount && typeof rawAccount === "object" && !Array.isArray(rawAccount)) {
+    const account = rawAccount as Partial<SpotifyAccountIdentity>
+    return {
+      id: typeof account.id === "string" ? account.id : typeof snapshot.source_user_id === "string" ? snapshot.source_user_id : null,
+      display_name: typeof account.display_name === "string" ? account.display_name : null,
+      image_url: typeof account.image_url === "string" ? account.image_url : null,
+      profile_url: typeof account.profile_url === "string" ? account.profile_url : null,
+      country: typeof account.country === "string" ? account.country : null,
+      product: typeof account.product === "string" ? account.product : null,
+    }
+  }
+
+  return typeof snapshot.source_user_id === "string"
+    ? {
+        id: snapshot.source_user_id,
+        display_name: null,
+        image_url: null,
+        profile_url: null,
+        country: null,
+        product: null,
+      }
+    : null
+}
+
+function AccountIdentityCard({
+  title,
+  account,
+  emptyMessage,
+}: {
+  title: string
+  account?: AccountCardIdentity | null
+  emptyMessage: string
+}) {
+  const hasIdentity = Boolean(account?.id || account?.display_name)
+
+  return (
+    <div className="rounded-3xl border border-border bg-white/80 p-4">
+      <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">{title}</p>
+      {hasIdentity ? (
+        <div className="mt-3 flex items-start gap-3">
+          {account?.image_url ? (
+            <img
+              src={account.image_url}
+              alt={getAccountDisplayName(account)}
+              className="h-12 w-12 rounded-full object-cover"
+              referrerPolicy="no-referrer"
+            />
+          ) : (
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-primary/12 text-sm font-semibold text-primary">
+              {getAccountInitials(account)}
+            </div>
+          )}
+          <div className="min-w-0">
+            <p className="font-semibold text-foreground">{getAccountDisplayName(account)}</p>
+            <p className="mt-1 break-words text-sm text-muted-foreground">{getAccountMeta(account)}</p>
+            {account?.profile_url ? (
+              <a
+                className="mt-2 inline-flex items-center gap-2 text-sm text-primary hover:underline"
+                href={account.profile_url}
+                rel="noreferrer"
+                target="_blank"
+              >
+                Open Spotify profile
+                <ExternalLink className="h-3.5 w-3.5" />
+              </a>
+            ) : null}
+          </div>
+        </div>
+      ) : (
+        <p className="mt-3 text-sm text-muted-foreground">{emptyMessage}</p>
+      )}
+    </div>
+  )
 }
 
 function SummaryGrid({ items }: { items: Array<{ label: string; value: number }> }) {
@@ -250,7 +356,24 @@ function DestructiveOperationList({ operations }: { operations: string[] }) {
 }
 
 export function TransferLibraryTool() {
-  const { isAuthenticated } = useSpotifySession()
+  const {
+    handleSpotifyLogin: handleSourceLogin,
+    isAuthenticated: isSourceAuthenticated,
+    whoAmIQuery: sourceWhoAmIQuery,
+  } = useSpotifySession({
+    accountRole: "source",
+    returnTo: "/app/transfer-library",
+  })
+  const {
+    handleSpotifyLogin: handleTargetLogin,
+    handleSpotifyLogout: handleTargetLogout,
+    isAuthenticated: isTargetAuthenticated,
+    isLoggingOut: isTargetLoggingOut,
+    whoAmIQuery: targetWhoAmIQuery,
+  } = useSpotifySession({
+    accountRole: "target",
+    returnTo: "/app/transfer-library",
+  })
 
   const [exportForm, setExportForm] = useState({
     cutoffDate: "",
@@ -267,11 +390,13 @@ export function TransferLibraryTool() {
   const [exportResult, setExportResult] = useState<DownloadedSnapshotResponse | null>(null)
 
   const [snapshotFile, setSnapshotFile] = useState<File | null>(null)
-  const [previewedSnapshot, setPreviewedSnapshot] = useState<SnapshotDocument | null>(null)
+  const [selectedSnapshotDocument, setSelectedSnapshotDocument] = useState<SnapshotDocument | null>(null)
+  const [snapshotFileError, setSnapshotFileError] = useState<string | null>(null)
   const [previewData, setPreviewData] = useState<SnapshotImportPreviewResponse["preview"] | null>(null)
   const [importConfirmationChecked, setImportConfirmationChecked] = useState(false)
   const [importJobId, setImportJobId] = useState<string | null>(null)
   const [importResult, setImportResult] = useState<UploadedImportResponse | null>(null)
+  const snapshotLoadRequestId = useRef(0)
   const [importForm, setImportForm] = useState({
     importPlaylists: true,
     importLikedTracks: true,
@@ -282,7 +407,7 @@ export function TransferLibraryTool() {
   })
 
   const startExportJobMutation = useMutation({
-    mutationFn: startExportSnapshotJob,
+    mutationFn: (payload: Parameters<typeof startExportSnapshotJob>[0]) => startExportSnapshotJob(payload, "source"),
     onSuccess: (job) => {
       setExportJobId(job.job_id)
     },
@@ -307,13 +432,51 @@ export function TransferLibraryTool() {
     }
   }, [exportJobQuery.data, lastDownloadedExportJobId, requestedExportFileName])
 
+  const resetImportWorkflow = () => {
+    setPreviewData(null)
+    setImportConfirmationChecked(false)
+    setImportJobId(null)
+    setImportResult(null)
+    previewSnapshotMutation.reset()
+    startImportJobMutation.reset()
+  }
+
+  const cacheSelectedSnapshotFile = (nextFile: File | null, snapshot?: SnapshotDocument | null) => {
+    snapshotLoadRequestId.current += 1
+    const requestId = snapshotLoadRequestId.current
+
+    setSnapshotFile(nextFile)
+    setSelectedSnapshotDocument(snapshot ?? null)
+    setSnapshotFileError(null)
+    resetImportWorkflow()
+
+    if (!nextFile || snapshot) {
+      return
+    }
+
+    void readSnapshotDocument(nextFile)
+      .then((parsedSnapshot) => {
+        if (snapshotLoadRequestId.current !== requestId) {
+          return
+        }
+        setSelectedSnapshotDocument(parsedSnapshot)
+      })
+      .catch((error) => {
+        if (snapshotLoadRequestId.current !== requestId) {
+          return
+        }
+        setSelectedSnapshotDocument(null)
+        setSnapshotFileError(getErrorMessage(error))
+      })
+  }
+
   const previewSnapshotMutation = useMutation({
     mutationFn: async (): Promise<PreviewSnapshotResult> => {
       if (!snapshotFile) {
         throw new Error("Choose a snapshot file before previewing the import.")
       }
 
-      const snapshot = await readSnapshotDocument(snapshotFile)
+      const snapshot = selectedSnapshotDocument || (await readSnapshotDocument(snapshotFile))
       const response = await previewSnapshotImport({
         snapshot,
         import_playlists: importForm.importPlaylists,
@@ -322,13 +485,14 @@ export function TransferLibraryTool() {
         import_followed_artists: importForm.importFollowedArtists,
         clear_existing_before_import: importForm.clearExistingBeforeImport,
         strict_liked_order: importForm.strictLikedOrder,
-      })
+      }, "target")
 
       return { response, snapshot }
     },
     onSuccess: ({ response, snapshot }) => {
       setPreviewData(response.preview)
-      setPreviewedSnapshot(snapshot)
+      setSelectedSnapshotDocument(snapshot)
+      setSnapshotFileError(null)
       setImportConfirmationChecked(false)
     },
   })
@@ -339,7 +503,8 @@ export function TransferLibraryTool() {
         throw new Error("Choose a snapshot file before starting the import.")
       }
 
-      const snapshot = previewedSnapshot || (await readSnapshotDocument(snapshotFile))
+      const snapshot = selectedSnapshotDocument || (await readSnapshotDocument(snapshotFile))
+      setSelectedSnapshotDocument(snapshot)
       return startImportSnapshotJob({
         snapshot,
         import_playlists: importForm.importPlaylists,
@@ -348,7 +513,7 @@ export function TransferLibraryTool() {
         import_followed_artists: importForm.importFollowedArtists,
         clear_existing_before_import: importForm.clearExistingBeforeImport,
         strict_liked_order: importForm.strictLikedOrder,
-      })
+      }, "target")
     },
     onSuccess: (job) => {
       setImportJobId(job.job_id)
@@ -428,15 +593,25 @@ export function TransferLibraryTool() {
       .filter((item) => item.value > 0)
   }, [importResult])
 
-  const resetImportWorkflow = () => {
-    setPreviewData(null)
-    setPreviewedSnapshot(null)
-    setImportConfirmationChecked(false)
-    setImportJobId(null)
-    setImportResult(null)
-    previewSnapshotMutation.reset()
-    startImportJobMutation.reset()
-  }
+  const selectedSnapshotSourceAccount = useMemo(
+    () => extractSnapshotSourceAccount(selectedSnapshotDocument),
+    [selectedSnapshotDocument],
+  )
+  const sameSourceAndTargetSelected = Boolean(
+    selectedSnapshotSourceAccount?.id &&
+      targetWhoAmIQuery.data?.id &&
+      selectedSnapshotSourceAccount.id === targetWhoAmIQuery.data.id,
+  )
+  const importIdentityWarnings = useMemo(() => {
+    const warnings: string[] = []
+    if (snapshotFileError) {
+      warnings.push(snapshotFileError)
+    }
+    if (sameSourceAndTargetSelected) {
+      warnings.push("This snapshot was exported from the same Spotify account currently selected for import.")
+    }
+    return warnings
+  }, [sameSourceAndTargetSelected, snapshotFileError])
 
   const handleExportSnapshot = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -472,8 +647,7 @@ export function TransferLibraryTool() {
 
   const handleSnapshotFileChange = (event: ChangeEvent<HTMLInputElement>) => {
     const nextFile = event.target.files?.[0] || null
-    setSnapshotFile(nextFile)
-    resetImportWorkflow()
+    cacheSelectedSnapshotFile(nextFile)
   }
 
   const handleDownloadAgain = () => {
@@ -485,7 +659,8 @@ export function TransferLibraryTool() {
   }
 
   const previewRequiresConfirmation = Boolean(previewData?.requires_confirmation)
-  const canStartImport = Boolean(previewData) && (!previewRequiresConfirmation || importConfirmationChecked) && !isImporting
+  const canStartImport =
+    Boolean(previewData) && isTargetAuthenticated && (!previewRequiresConfirmation || importConfirmationChecked) && !isImporting
   const snapshotReady = Boolean(snapshotFile || exportResult)
 
   const transferFlowSteps = [
@@ -509,8 +684,7 @@ export function TransferLibraryTool() {
     }
 
     const nextFile = snapshotDocumentToFile(exportResult.snapshot, exportResult.downloaded_file_name)
-    setSnapshotFile(nextFile)
-    resetImportWorkflow()
+    cacheSelectedSnapshotFile(nextFile, exportResult.snapshot)
   }
 
   const exportCard = (
@@ -524,8 +698,22 @@ export function TransferLibraryTool() {
         </p>
       </div>
       <div className="mt-6 space-y-5">
-        {!isAuthenticated ? (
-          <AuthRequiredNotice message="Connect Spotify first to export a snapshot from the current account." />
+        <div className="space-y-3">
+          <AccountIdentityCard
+            title="Connected source account"
+            account={sourceWhoAmIQuery.data}
+            emptyMessage="Connect the source Spotify account to export a fresh snapshot."
+          />
+          <div className="flex flex-wrap gap-3">
+            <Button onClick={handleSourceLogin} type="button" variant="outline">
+              <RefreshCw className="h-4 w-4" />
+              {isSourceAuthenticated ? "Switch source account" : "Connect source account"}
+            </Button>
+          </div>
+        </div>
+
+        {!isSourceAuthenticated ? (
+          <AuthRequiredNotice message="Connect Spotify first to export a snapshot from the selected source account." />
         ) : null}
 
         <form className="space-y-4" onSubmit={handleExportSnapshot}>
@@ -569,7 +757,7 @@ export function TransferLibraryTool() {
             ))}
           </div>
 
-          <Button className="w-full sm:w-auto" disabled={!isAuthenticated || isExporting || startExportJobMutation.isPending} type="submit">
+          <Button className="w-full sm:w-auto" disabled={!isSourceAuthenticated || isExporting || startExportJobMutation.isPending} type="submit">
             {isExporting ? (
               <LoaderCircle className="h-4 w-4 animate-spin" />
             ) : (
@@ -612,10 +800,11 @@ export function TransferLibraryTool() {
             <SummaryGrid items={exportSummaryItems} />
 
             <div className="grid gap-3 sm:grid-cols-2">
-              <div className="rounded-2xl border border-border bg-white/80 px-4 py-3 text-sm">
-                <p className="font-medium text-foreground">Source account</p>
-                <p className="mt-1 text-muted-foreground">{exportResult.source_user_id || "Unknown"}</p>
-              </div>
+              <AccountIdentityCard
+                title="Snapshot source account"
+                account={exportResult.source_account || sourceWhoAmIQuery.data}
+                emptyMessage="Source account details were not available in the export response."
+              />
               <div className="rounded-2xl border border-border bg-white/80 px-4 py-3 text-sm">
                 <p className="font-medium text-foreground">Exported at</p>
                 <p className="mt-1 text-muted-foreground">{formatDateTime(exportResult.exported_at)}</p>
@@ -625,6 +814,8 @@ export function TransferLibraryTool() {
                 <p className="mt-1 text-muted-foreground">{formatDateTime(exportResult.cutoff_date)}</p>
               </div>
             </div>
+
+            <WarningList warnings={exportResult.warnings || []} />
 
             <div className="flex flex-wrap gap-3">
               <Button onClick={handleUseExportForImport} variant="secondary">
@@ -653,10 +844,6 @@ export function TransferLibraryTool() {
         </p>
       </div>
       <div className="mt-6 space-y-5">
-        {!isAuthenticated ? (
-          <AuthRequiredNotice message="Connect Spotify first to apply a snapshot into the active account." />
-        ) : null}
-
         <div className="rounded-3xl border border-border bg-muted/45 p-4">
           <p className="text-sm font-medium text-foreground">Selected file</p>
           <p className="mt-2 text-lg font-semibold">{snapshotFile ? snapshotFile.name : "No snapshot selected yet"}</p>
@@ -666,6 +853,44 @@ export function TransferLibraryTool() {
               : "Choose a JSON snapshot file exported from Spotify Time Machine or send one over from step 1."}
           </p>
         </div>
+
+        <div className="grid gap-3 sm:grid-cols-2">
+          <AccountIdentityCard
+            title="Snapshot source account"
+            account={selectedSnapshotSourceAccount}
+            emptyMessage="Choose a snapshot file to see which account it came from."
+          />
+          <div className="space-y-3">
+            <AccountIdentityCard
+              title="Import target account"
+              account={targetWhoAmIQuery.data}
+              emptyMessage="Connect the Spotify account that should receive the import."
+            />
+            <div className="flex flex-wrap gap-3">
+              <Button onClick={handleTargetLogin} type="button" variant="outline">
+                <RefreshCw className="h-4 w-4" />
+                {isTargetAuthenticated ? "Switch import account" : "Connect import account"}
+              </Button>
+              {isTargetAuthenticated ? (
+                <Button
+                  disabled={isTargetLoggingOut}
+                  onClick={() => void handleTargetLogout()}
+                  type="button"
+                  variant="ghost"
+                >
+                  {isTargetLoggingOut ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <LogOut className="h-4 w-4" />}
+                  Disconnect import account
+                </Button>
+              ) : null}
+            </div>
+          </div>
+        </div>
+
+        {!isTargetAuthenticated ? (
+          <AuthRequiredNotice message="Connect the target Spotify account before previewing or applying the snapshot." />
+        ) : null}
+
+        <WarningList warnings={importIdentityWarnings} />
 
         <form className="space-y-4" onSubmit={handleImportSnapshot}>
           <div className="space-y-2">
@@ -697,7 +922,7 @@ export function TransferLibraryTool() {
           <div className="flex flex-wrap gap-3">
             <Button
               className="w-full sm:w-auto"
-              disabled={!isAuthenticated || !snapshotFile || previewSnapshotMutation.isPending || isImporting}
+              disabled={!isTargetAuthenticated || !snapshotFile || previewSnapshotMutation.isPending || isImporting}
               onClick={() => void handlePreviewImport()}
               type="button"
               variant="secondary"
@@ -759,14 +984,16 @@ export function TransferLibraryTool() {
             </div>
 
             <div className="grid gap-3 sm:grid-cols-2">
-              <div className="rounded-2xl border border-border bg-muted/45 px-4 py-3 text-sm">
-                <p className="font-medium text-foreground">Source account</p>
-                <p className="mt-1 text-muted-foreground">{previewData.source_user_id || "Unknown"}</p>
-              </div>
-              <div className="rounded-2xl border border-border bg-muted/45 px-4 py-3 text-sm">
-                <p className="font-medium text-foreground">Target account</p>
-                <p className="mt-1 text-muted-foreground">{previewData.target_user_id || "Unknown"}</p>
-              </div>
+              <AccountIdentityCard
+                title="Preview source account"
+                account={previewData.source_account}
+                emptyMessage="Source account details were not available in this snapshot."
+              />
+              <AccountIdentityCard
+                title="Preview target account"
+                account={previewData.target_account}
+                emptyMessage="Target account details were not available in the preview response."
+              />
             </div>
 
             <SummaryGrid
@@ -797,7 +1024,7 @@ export function TransferLibraryTool() {
                   checked={importConfirmationChecked}
                   onChange={(event) => setImportConfirmationChecked(event.target.checked)}
                 />
-                <span>I understand the selected content in the connected account will be removed before the snapshot is applied.</span>
+                <span>I understand the selected content in the target account will be removed before the snapshot is applied.</span>
               </label>
             ) : null}
           </div>
@@ -823,14 +1050,16 @@ export function TransferLibraryTool() {
             />
 
             <div className="grid gap-3 sm:grid-cols-2">
-              <div className="rounded-2xl border border-border bg-white/80 px-4 py-3 text-sm">
-                <p className="font-medium text-foreground">Source account</p>
-                <p className="mt-1 text-muted-foreground">{importResult.result.source_user_id || "Unknown"}</p>
-              </div>
-              <div className="rounded-2xl border border-border bg-white/80 px-4 py-3 text-sm">
-                <p className="font-medium text-foreground">Target account</p>
-                <p className="mt-1 text-muted-foreground">{importResult.result.target_user_id || "Unknown"}</p>
-              </div>
+              <AccountIdentityCard
+                title="Imported from"
+                account={importResult.result.source_account}
+                emptyMessage="Source account details were not available in the snapshot."
+              />
+              <AccountIdentityCard
+                title="Imported into"
+                account={importResult.result.target_account}
+                emptyMessage="Target account details were not available in the import response."
+              />
             </div>
 
             {importRemovalItems.length ? (
@@ -858,7 +1087,7 @@ export function TransferLibraryTool() {
   return (
     <section id="transfer-tools" className="section-shell animate-fade-up overflow-hidden">
       <div className="flex flex-wrap items-center gap-3">
-        <span className="hero-badge">One connected workflow</span>
+        <span className="hero-badge">Source and target accounts</span>
         <Badge variant={importResult ? "default" : snapshotReady ? "secondary" : "outline"}>
           {importResult ? "Transfer applied" : snapshotReady ? "Snapshot ready" : "Prepare a snapshot"}
         </Badge>

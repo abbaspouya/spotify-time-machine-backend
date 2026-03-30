@@ -14,20 +14,31 @@ export function AuthCallbackPage() {
 
   const status = searchParams.get("status") ?? "error"
   const detail = searchParams.get("detail")
+  const accountRole = searchParams.get("account_role") ?? "source"
+  const returnTo = searchParams.get("return_to")
   const isSuccess = status === "success"
 
   useEffect(() => {
-    void Promise.all([
-      queryClient.invalidateQueries({ queryKey: ["authStatus"] }),
-      queryClient.invalidateQueries({ queryKey: ["whoami"] }),
-    ])
+    void Promise.all(
+      ["authStatus", "whoami"].map((queryRoot) =>
+        queryClient.invalidateQueries({
+          predicate: (query) => Array.isArray(query.queryKey) && query.queryKey[0] === queryRoot,
+        }),
+      ),
+    )
 
     const timeout = window.setTimeout(() => {
-      navigate(isSuccess ? "/app" : "/", { replace: true })
+      navigate(isSuccess ? returnTo || "/app" : returnTo || "/", { replace: true })
     }, isSuccess ? 1400 : 2800)
 
     return () => window.clearTimeout(timeout)
-  }, [isSuccess, navigate, queryClient])
+  }, [isSuccess, navigate, queryClient, returnTo])
+
+  const successTitle = accountRole === "target" ? "Import account connection complete" : "Spotify connection complete"
+  const successDescription =
+    accountRole === "target"
+      ? "Your import account is ready and the transfer page is refreshing."
+      : "Your Spotify connection is ready and the app is refreshing."
 
   return (
     <div className="container flex min-h-[70vh] items-center justify-center py-12">
@@ -41,20 +52,25 @@ export function AuthCallbackPage() {
           >
             {isSuccess ? <CheckCircle2 className="h-7 w-7" /> : <OctagonAlert className="h-7 w-7" />}
           </div>
-          <CardTitle>{isSuccess ? "Spotify connection complete" : "Spotify connection failed"}</CardTitle>
+          <CardTitle>{isSuccess ? successTitle : "Spotify connection failed"}</CardTitle>
           <CardDescription>
             {isSuccess
-              ? "Your Spotify connection is ready and the app is refreshing."
+              ? successDescription
               : detail || "Spotify did not return a usable authorization code."}
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
           <div className="rounded-2xl border border-border bg-muted/55 px-4 py-3 text-sm text-muted-foreground">
             <LoaderCircle className="mr-2 inline h-4 w-4 animate-spin" />
-            {isSuccess ? "Redirecting into the dashboard now." : "Redirecting back to the homepage now."}
+            {isSuccess
+              ? `Redirecting back to ${returnTo || "/app"} now.`
+              : `Redirecting back to ${returnTo || "/"} now.`}
           </div>
-          <Link to={isSuccess ? "/app" : "/"} className={cn(buttonVariants({ variant: "outline" }), "w-fit")}>
-            {isSuccess ? "Open dashboard now" : "Return to homepage"}
+          <Link
+            to={isSuccess ? returnTo || "/app" : returnTo || "/"}
+            className={cn(buttonVariants({ variant: "outline" }), "w-fit")}
+          >
+            {isSuccess ? "Open destination now" : "Return now"}
           </Link>
         </CardContent>
       </Card>

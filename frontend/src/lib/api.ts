@@ -12,6 +12,7 @@ import type {
   LanguageGroupsResponse,
   PlaylistMutationResponse,
   SearchArtistsResponse,
+  SpotifyAccountRole,
   AsyncJob,
   TopTracksRequest,
   TopTracksResponse,
@@ -81,16 +82,34 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return payload as T
 }
 
-export function getLoginUrl() {
-  return `${API_BASE_URL}/login`
+type AccountScopedRequestOptions = {
+  accountRole?: SpotifyAccountRole
+}
+
+type LoginUrlOptions = AccountScopedRequestOptions & {
+  returnTo?: string
+}
+
+function buildAccountRoleQuery(accountRole?: SpotifyAccountRole) {
+  return buildQuery({
+    account_role: accountRole,
+  })
+}
+
+export function getLoginUrl(options?: LoginUrlOptions) {
+  const query = buildQuery({
+    account_role: options?.accountRole,
+    return_to: options?.returnTo,
+  })
+  return `${API_BASE_URL}/login${query}`
 }
 
 export function getDocsUrl() {
   return `${API_BASE_URL}/docs`
 }
 
-export async function getAuthStatus() {
-  return request<AuthStatus>("/auth_status")
+export async function getAuthStatus(accountRole?: SpotifyAccountRole) {
+  return request<AuthStatus>(`/auth_status${buildAccountRoleQuery(accountRole)}`)
 }
 
 export async function getTopTracks(payload: TopTracksRequest) {
@@ -103,12 +122,12 @@ export async function getTopTracks(payload: TopTracksRequest) {
   )
 }
 
-export async function getWhoAmI() {
-  return request<WhoAmI>("/whoami")
+export async function getWhoAmI(accountRole?: SpotifyAccountRole) {
+  return request<WhoAmI>(`/whoami${buildAccountRoleQuery(accountRole)}`)
 }
 
-export async function logoutSpotify() {
-  return request<{ authenticated: false }>("/logout", {
+export async function logoutSpotify(accountRole?: SpotifyAccountRole) {
+  return request<{ authenticated: false }>(`/logout${buildAccountRoleQuery(accountRole)}`, {
     method: "POST",
   })
 }
@@ -170,36 +189,36 @@ export async function searchArtists(query: string, limit = 8) {
   )
 }
 
-export async function exportSnapshot(payload: ExportSnapshotPayload) {
-  return request<ExportSnapshotResponse>("/export_account_snapshot", {
+export async function exportSnapshot(payload: ExportSnapshotPayload, accountRole?: SpotifyAccountRole) {
+  return request<ExportSnapshotResponse>(`/export_account_snapshot${buildAccountRoleQuery(accountRole)}`, {
     method: "POST",
     body: JSON.stringify(payload),
   })
 }
 
-export async function startExportSnapshotJob(payload: ExportSnapshotPayload) {
-  return request<AsyncJob<ExportSnapshotResponse>>("/jobs/export_account_snapshot", {
+export async function startExportSnapshotJob(payload: ExportSnapshotPayload, accountRole?: SpotifyAccountRole) {
+  return request<AsyncJob<ExportSnapshotResponse>>(`/jobs/export_account_snapshot${buildAccountRoleQuery(accountRole)}`, {
     method: "POST",
     body: JSON.stringify(payload),
   })
 }
 
-export async function importSnapshot(payload: ImportSnapshotPayload) {
-  return request<ImportSnapshotResponse>("/import_account_snapshot", {
+export async function importSnapshot(payload: ImportSnapshotPayload, accountRole?: SpotifyAccountRole) {
+  return request<ImportSnapshotResponse>(`/import_account_snapshot${buildAccountRoleQuery(accountRole)}`, {
     method: "POST",
     body: JSON.stringify(payload),
   })
 }
 
-export async function previewSnapshotImport(payload: ImportSnapshotPayload) {
-  return request<SnapshotImportPreviewResponse>("/preview_account_snapshot_import", {
+export async function previewSnapshotImport(payload: ImportSnapshotPayload, accountRole?: SpotifyAccountRole) {
+  return request<SnapshotImportPreviewResponse>(`/preview_account_snapshot_import${buildAccountRoleQuery(accountRole)}`, {
     method: "POST",
     body: JSON.stringify(payload),
   })
 }
 
-export async function startImportSnapshotJob(payload: ImportSnapshotPayload) {
-  return request<AsyncJob<ImportSnapshotResponse>>("/jobs/import_account_snapshot", {
+export async function startImportSnapshotJob(payload: ImportSnapshotPayload, accountRole?: SpotifyAccountRole) {
+  return request<AsyncJob<ImportSnapshotResponse>>(`/jobs/import_account_snapshot${buildAccountRoleQuery(accountRole)}`, {
     method: "POST",
     body: JSON.stringify(payload),
   })

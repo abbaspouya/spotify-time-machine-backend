@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
 import { getAuthStatus, getLoginUrl, getWhoAmI, logoutSpotify } from "@/lib/api"
+import type { SpotifyAccountRole } from "@/lib/types"
 
 export function formatExpiresAt(value?: number | null) {
   if (!value) {
@@ -14,43 +15,53 @@ export function getErrorMessage(error: unknown) {
   return error instanceof Error ? error.message : "Something went wrong."
 }
 
-export function useSpotifySession() {
+type UseSpotifySessionOptions = {
+  accountRole?: SpotifyAccountRole
+  returnTo?: string
+}
+
+export function useSpotifySession(options: UseSpotifySessionOptions = {}) {
   const queryClient = useQueryClient()
+  const accountRole = options.accountRole ?? "source"
 
   const authStatusQuery = useQuery({
-    queryKey: ["authStatus"],
-    queryFn: getAuthStatus,
+    queryKey: ["authStatus", accountRole],
+    queryFn: () => getAuthStatus(accountRole),
   })
 
   const isAuthenticated = authStatusQuery.data?.authenticated === true
 
   const whoAmIQuery = useQuery({
-    queryKey: ["whoami"],
-    queryFn: getWhoAmI,
+    queryKey: ["whoami", accountRole],
+    queryFn: () => getWhoAmI(accountRole),
     enabled: isAuthenticated,
   })
 
   const handleSpotifyLogin = () => {
-    window.location.href = getLoginUrl()
+    window.location.href = getLoginUrl({
+      accountRole,
+      returnTo: options.returnTo,
+    })
   }
 
   const logoutMutation = useMutation({
-    mutationFn: logoutSpotify,
+    mutationFn: () => logoutSpotify(accountRole),
     onSuccess: async () => {
-      queryClient.setQueryData(["authStatus"], { authenticated: false })
-      queryClient.removeQueries({ queryKey: ["whoami"] })
-      await queryClient.invalidateQueries({ queryKey: ["authStatus"] })
+      queryClient.setQueryData(["authStatus", accountRole], { authenticated: false })
+      queryClient.removeQueries({ queryKey: ["whoami", accountRole] })
+      await queryClient.invalidateQueries({ queryKey: ["authStatus", accountRole] })
     },
   })
 
   const refreshSession = async () => {
     await Promise.all([
-      queryClient.invalidateQueries({ queryKey: ["authStatus"] }),
-      queryClient.invalidateQueries({ queryKey: ["whoami"] }),
+      queryClient.invalidateQueries({ queryKey: ["authStatus", accountRole] }),
+      queryClient.invalidateQueries({ queryKey: ["whoami", accountRole] }),
     ])
   }
 
   return {
+    accountRole,
     authStatusQuery,
     isAuthenticated,
     whoAmIQuery,

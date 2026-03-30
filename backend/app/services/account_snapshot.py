@@ -8,6 +8,7 @@ import json
 import re
 
 import spotipy
+from spotipy.exceptions import SpotifyException
 
 from .spotify_playlists import add_items_to_playlist, create_current_user_playlist
 
@@ -116,6 +117,62 @@ def _report_progress(callback: ProgressCallback | None, progress: int | None, me
         return
 
     callback(progress, message)
+
+
+def _build_account_identity(user: Any) -> dict[str, Any] | None:
+    if not isinstance(user, dict):
+        return None
+
+    images = user.get("images")
+    image_url = user.get("image_url") if isinstance(user.get("image_url"), str) else None
+    if isinstance(images, list):
+        for image in images:
+            if not isinstance(image, dict):
+                continue
+            candidate = image.get("url")
+            if isinstance(candidate, str) and candidate:
+                image_url = candidate
+                break
+
+    external_urls = user.get("external_urls")
+    profile_url = user.get("profile_url") if isinstance(user.get("profile_url"), str) else None
+    if isinstance(external_urls, dict):
+        spotify_url = external_urls.get("spotify")
+        if isinstance(spotify_url, str) and spotify_url:
+            profile_url = spotify_url
+
+    return {
+        "id": user.get("id") if isinstance(user.get("id"), str) else None,
+        "display_name": user.get("display_name") if isinstance(user.get("display_name"), str) else None,
+        "image_url": image_url,
+        "profile_url": profile_url if isinstance(profile_url, str) else None,
+        "country": user.get("country") if isinstance(user.get("country"), str) else None,
+        "product": user.get("product") if isinstance(user.get("product"), str) else None,
+    }
+
+
+def _extract_snapshot_source_account(snapshot: dict[str, Any]) -> dict[str, Any] | None:
+    source_account = snapshot.get("source_account")
+    if isinstance(source_account, dict):
+        identity = _build_account_identity(source_account)
+        if identity is not None:
+            fallback_id = snapshot.get("source_user_id")
+            if not identity.get("id") and isinstance(fallback_id, str):
+                identity["id"] = fallback_id
+            return identity
+
+    source_user_id = snapshot.get("source_user_id")
+    if isinstance(source_user_id, str) and source_user_id:
+        return {
+            "id": source_user_id,
+            "display_name": None,
+            "image_url": None,
+            "profile_url": None,
+            "country": None,
+            "product": None,
+        }
+
+    return None
 
 
 def _build_empty_import_summary() -> dict[str, int]:
@@ -274,11 +331,15 @@ def export_account_snapshot(
     cutoff_dt = _parse_iso_datetime(cutoff_date) if cutoff_date else None
     now_utc = datetime.now(timezone.utc)
     me = sp.current_user()
+    source_account = _build_account_identity(me)
+    source_user_id = source_account.get("id") if isinstance(source_account, dict) else None
 
     snapshot: dict[str, Any] = {
         "exported_at": now_utc.isoformat().replace("+00:00", "Z"),
         "cutoff_date": cutoff_dt.isoformat().replace("+00:00", "Z") if cutoff_dt else None,
-        "source_user_id": me.get("id"),
+        "source_user_id": source_user_id,
+        "source_account": source_account,
+        "warnings": [],
         "notes": {
             "followed_artists_cutoff_supported": False,
             "followed_artists_reason": "Spotify API does not return follow date, so cutoff cannot be applied.",
@@ -321,8 +382,26 @@ def export_account_snapshot(
                 }
 
                 playlist_offset = 0
+                skip_playlist = False
                 while True:
-                    tracks_page = sp.playlist_items(playlist_id, limit=100, offset=playlist_offset)
+                    try:
+                        # Snapshot imports only support tracks, so request tracks explicitly.
+                        tracks_page = sp.playlist_items(
+                            playlist_id,
+                            limit=100,
+                            offset=playlist_offset,
+                            additional_types=("track",),
+                        )
+                    except SpotifyException as exc:
+                        if getattr(exc, "http_status", None) == 403:
+                            playlist_name = exported_playlist["name"] or playlist_id
+                            snapshot["warnings"].append(
+                                f"Skipped playlist '{playlist_name}' ({playlist_id}) because Spotify denied access to its tracks."
+                            )
+                            skip_playlist = True
+                            break
+                        raise
+
                     track_items = tracks_page.get("items", [])
                     if not track_items:
                         break
@@ -351,6 +430,9 @@ def export_account_snapshot(
                     playlist_offset += len(track_items)
                     if len(track_items) < 100:
                         break
+
+                if skip_playlist:
+                    continue
 
                 snapshot["playlists"].append(exported_playlist)
 
@@ -522,12 +604,16 @@ def import_account_snapshot(
 ) -> dict[str, Any]:
     _report_progress(progress_callback, 5, "Preparing snapshot import")
     me = sp.current_user()
-    user_id = me.get("id")
+    target_account = _build_account_identity(me)
+    user_id = target_account.get("id") if isinstance(target_account, dict) else None
+    source_account = _extract_snapshot_source_account(snapshot)
 
     result: dict[str, Any] = {
         "imported_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
         "target_user_id": user_id,
-        "source_user_id": snapshot.get("source_user_id"),
+        "target_account": target_account,
+        "source_user_id": source_account.get("id") if isinstance(source_account, dict) else snapshot.get("source_user_id"),
+        "source_account": source_account,
         "summary": _build_empty_import_summary(),
         "created_playlists": [],
         "warnings": [],
@@ -768,14 +854,17 @@ def preview_account_snapshot_import(
     strict_liked_order: bool = False,
 ) -> dict[str, Any]:
     me = sp.current_user()
-    user_id = me.get("id")
+    target_account = _build_account_identity(me)
+    user_id = target_account.get("id") if isinstance(target_account, dict) else None
+    source_account = _extract_snapshot_source_account(snapshot)
+    source_user_id = source_account.get("id") if isinstance(source_account, dict) else snapshot.get("source_user_id")
 
     warnings: list[str] = []
     destructive_operations: list[str] = []
     summary = _build_empty_import_summary()
     snapshot_counts = summarize_snapshot(snapshot)
 
-    if snapshot.get("source_user_id") == user_id and user_id:
+    if source_user_id == user_id and user_id:
         warnings.append(
             "The snapshot was exported from the same Spotify account that is currently connected."
         )
@@ -865,8 +954,10 @@ def preview_account_snapshot_import(
 
     return {
         "previewed_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
-        "source_user_id": snapshot.get("source_user_id"),
+        "source_user_id": source_user_id,
+        "source_account": source_account,
         "target_user_id": user_id,
+        "target_account": target_account,
         "snapshot_counts": snapshot_counts,
         "summary": summary,
         "requested_actions": {

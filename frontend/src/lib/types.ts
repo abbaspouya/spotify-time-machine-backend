@@ -1,8 +1,19 @@
+export type SpotifyAccountRole = "source" | "target"
+
 export type AuthStatus = {
   authenticated: boolean
   expires_at?: number | null
   scope?: string | null
   token_type?: string | null
+}
+
+export type SpotifyAccountIdentity = {
+  id: string | null
+  display_name: string | null
+  image_url: string | null
+  profile_url: string | null
+  country: string | null
+  product: string | null
 }
 
 export type TopTracksTimeframeKey = "1_week" | "4_weeks" | "6_months" | "lifetime" | "custom"
@@ -50,14 +61,8 @@ export type TopTracksResponse = {
   retrieved_at: string | null
 }
 
-export type WhoAmI = {
-  id: string
-  display_name: string | null
+export type WhoAmI = SpotifyAccountIdentity & {
   email: string | null
-  country: string | null
-  product: string | null
-  image_url: string | null
-  profile_url: string | null
 }
 
 export type GroupedSongsResponse = {
@@ -128,7 +133,15 @@ export type ExportSnapshotPayload = {
   return_snapshot?: boolean
 }
 
-export type SnapshotDocument = Record<string, unknown>
+export type SnapshotDocument = {
+  exported_at?: string | null
+  cutoff_date?: string | null
+  source_user_id?: string | null
+  source_account?: SpotifyAccountIdentity | null
+  counts?: Partial<SnapshotCounts>
+  warnings?: string[]
+  [key: string]: unknown
+}
 
 export type SnapshotCounts = {
   playlists: number
@@ -143,6 +156,8 @@ export type ExportSnapshotResponse = {
   file_path: string | null
   counts: SnapshotCounts
   source_user_id: string | null
+  source_account: SpotifyAccountIdentity | null
+  warnings: string[]
   exported_at: string | null
   cutoff_date: string | null
   snapshot?: SnapshotDocument
@@ -194,6 +209,8 @@ export type ImportSnapshotResult = {
   imported_at: string
   target_user_id: string | null
   source_user_id: string | null
+  target_account: SpotifyAccountIdentity | null
+  source_account: SpotifyAccountIdentity | null
   summary: ImportSnapshotSummary
   created_playlists: ImportedPlaylistSummary[]
   warnings: string[]
@@ -208,6 +225,8 @@ export type SnapshotImportPreview = {
   previewed_at: string
   target_user_id: string | null
   source_user_id: string | null
+  target_account: SpotifyAccountIdentity | null
+  source_account: SpotifyAccountIdentity | null
   snapshot_counts: SnapshotCounts
   summary: ImportSnapshotSummary
   requested_actions: SnapshotImportRequestedActions

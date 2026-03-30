@@ -22,6 +22,8 @@ from .config import (
 
 _SESSION_ID_PATTERN = re.compile(r"^[A-Za-z0-9._-]{20,}$")
 _SESSION_LOCK = Lock()
+ACCOUNT_ROLES = ("source", "target")
+DEFAULT_ACCOUNT_ROLE = "source"
 
 
 def _utc_now() -> datetime:
@@ -42,6 +44,14 @@ def _is_valid_session_id(session_id: str | None) -> bool:
 
 def _ensure_session_dir() -> None:
     SESSION_DIR.mkdir(parents=True, exist_ok=True)
+
+
+def normalize_account_role(account_role: str | None) -> str:
+    normalized = (account_role or DEFAULT_ACCOUNT_ROLE).strip().lower()
+    if normalized not in ACCOUNT_ROLES:
+        allowed = ", ".join(ACCOUNT_ROLES)
+        raise ValueError(f"Unsupported account role '{account_role}'. Use one of: {allowed}.")
+    return normalized
 
 
 def _write_session_file(path: Path, data: dict[str, Any]) -> None:
@@ -121,7 +131,7 @@ def create_session() -> str:
     data = {
         "created_at": now,
         "updated_at": now,
-        "token_info": None,
+        "account_tokens": {},
     }
     _save_session_data(session_id, data)
     return session_id
@@ -151,22 +161,78 @@ def touch_session(session_id: str) -> None:
     _save_session_data(session_id, data)
 
 
-def get_token_info(session_id: str) -> dict[str, Any] | None:
+def _get_account_tokens(data: dict[str, Any]) -> dict[str, Any]:
+    account_tokens = data.get("account_tokens")
+    if isinstance(account_tokens, dict):
+        return account_tokens
+
+    legacy_token = data.get("token_info")
+    if isinstance(legacy_token, dict):
+        return {DEFAULT_ACCOUNT_ROLE: legacy_token}
+
+    return {}
+
+
+def _ensure_account_tokens(data: dict[str, Any]) -> dict[str, Any]:
+    account_tokens = _get_account_tokens(data)
+    data["account_tokens"] = account_tokens
+    data.pop("token_info", None)
+    return account_tokens
+
+
+def get_token_info(session_id: str, account_role: str = DEFAULT_ACCOUNT_ROLE) -> dict[str, Any] | None:
     cleanup_expired_sessions()
     data = _load_session_data(session_id)
     if data is None:
         return None
 
-    token_info = data.get("token_info")
+    normalized_role = normalize_account_role(account_role)
+    token_info = _get_account_tokens(data).get(normalized_role)
     return token_info if isinstance(token_info, dict) else None
 
 
-def save_token_info(session_id: str, token_info: dict[str, Any] | None) -> None:
+def save_token_info(
+    session_id: str,
+    token_info: dict[str, Any] | None,
+    account_role: str = DEFAULT_ACCOUNT_ROLE,
+) -> None:
     data = _load_session_data(session_id) or {
         "created_at": _utc_now_iso(),
     }
-    data["token_info"] = token_info
+    normalized_role = normalize_account_role(account_role)
+    account_tokens = _ensure_account_tokens(data)
+    account_tokens[normalized_role] = token_info
     _save_session_data(session_id, data)
+
+
+def has_any_token_info(session_id: str) -> bool:
+    cleanup_expired_sessions()
+    data = _load_session_data(session_id)
+    if data is None:
+        return False
+
+    return any(isinstance(token_info, dict) and token_info for token_info in _get_account_tokens(data).values())
+
+
+def set_pending_auth(session_id: str, account_role: str, return_to: str | None = None) -> None:
+    data = _load_session_data(session_id) or {
+        "created_at": _utc_now_iso(),
+    }
+    data["pending_auth"] = {
+        "account_role": normalize_account_role(account_role),
+        "return_to": return_to,
+    }
+    _save_session_data(session_id, data)
+
+
+def pop_pending_auth(session_id: str) -> dict[str, Any] | None:
+    data = _load_session_data(session_id)
+    if data is None:
+        return None
+
+    pending_auth = data.pop("pending_auth", None)
+    _save_session_data(session_id, data)
+    return pending_auth if isinstance(pending_auth, dict) else None
 
 
 def delete_session(session_id: str) -> None:
