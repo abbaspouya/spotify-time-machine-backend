@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException, Query, Request
 
 from ..core.auth import get_spotify_client
 from ..schemas.playlist import CreateLanguagePlaylistRequest, CreatePlaylistRequest
+from ..services.spotify_playlists import create_current_user_playlist
 from ..services.spotify_time_machine import (
     add_tracks_in_chunks,
     fetch_all_liked_songs,
@@ -58,14 +59,11 @@ def create_playlist_for_group(request: Request, payload: CreatePlaylistRequest):
     if not track_ids:
         raise HTTPException(status_code=400, detail="No tracks in this group.")
 
-    me = sp.current_user()
-    user_id = me["id"]
-
     name = payload.playlist_name or f"Liked Songs - {payload.group_key}"
     description = payload.playlist_description or f"Liked songs for period {payload.group_key}"
 
-    playlist = sp.user_playlist_create(
-        user=user_id,
+    playlist = create_current_user_playlist(
+        sp=sp,
         name=name,
         public=False,
         description=description,
@@ -106,14 +104,11 @@ def create_playlist_by_language(request: Request, payload: CreateLanguagePlaylis
     if len(track_ids) < payload.min_songs:
         raise HTTPException(status_code=400, detail="Not enough songs to create a playlist")
 
-    me = sp.current_user()
-    user_id = me["id"]
-
     name = payload.playlist_name or f"Liked Songs - {payload.language_code.upper()}"
     description = f"Liked songs detected as {payload.language_code.upper()}"
 
-    playlist = sp.user_playlist_create(
-        user=user_id,
+    playlist = create_current_user_playlist(
+        sp=sp,
         name=name,
         public=False,
         description=description,

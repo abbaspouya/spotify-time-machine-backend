@@ -4,6 +4,8 @@ from typing import Optional, List, Dict
 import spotipy
 from langdetect import detect, LangDetectException
 
+from .spotify_playlists import add_items_to_playlist
+
 
 def fetch_all_liked_songs(sp: spotipy.Spotify, limit: int = 50):
     """Fetch all liked songs (saved tracks) for the current user."""
@@ -75,7 +77,7 @@ def add_tracks_in_chunks(sp: spotipy.Spotify, playlist_id: str, track_ids: list[
     for i in range(0, len(track_ids), chunk_size):
         chunk = track_ids[i:i + chunk_size]
         if chunk:
-            sp.playlist_add_items(playlist_id, chunk)
+            add_items_to_playlist(sp, playlist_id, chunk)
 
 
 

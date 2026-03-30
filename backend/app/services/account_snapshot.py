@@ -9,6 +9,8 @@ import re
 
 import spotipy
 
+from .spotify_playlists import add_items_to_playlist, create_current_user_playlist
+
 
 BACKEND_DIR = Path(__file__).resolve().parents[2]
 PROJECT_ROOT = BACKEND_DIR.parent
@@ -615,16 +617,16 @@ def import_account_snapshot(
                 public = bool(playlist.get("public", False))
 
                 try:
-                    created = sp.user_playlist_create(
-                        user=user_id,
+                    created = create_current_user_playlist(
+                        sp=sp,
                         name=name,
                         public=public,
                         description=description,
                     )
                 except Exception:
                     # Retry as private if public creation is not permitted.
-                    created = sp.user_playlist_create(
-                        user=user_id,
+                    created = create_current_user_playlist(
+                        sp=sp,
                         name=name,
                         public=False,
                         description=description,
@@ -652,13 +654,13 @@ def import_account_snapshot(
                 uris = _normalize_uri_entries(ordered_track_entries)
                 for uri_chunk in _chunk(uris, 100):
                     try:
-                        sp.playlist_add_items(playlist_id, uri_chunk)
+                        add_items_to_playlist(sp, playlist_id, uri_chunk)
                         result["summary"]["playlist_tracks_added"] += len(uri_chunk)
                     except Exception:
                         # Fall back to single inserts to salvage valid tracks.
                         for uri in uri_chunk:
                             try:
-                                sp.playlist_add_items(playlist_id, [uri])
+                                add_items_to_playlist(sp, playlist_id, [uri])
                                 result["summary"]["playlist_tracks_added"] += 1
                             except Exception:
                                 result["summary"]["playlist_tracks_failed"] += 1
