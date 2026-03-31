@@ -4,6 +4,7 @@ from spotipy.exceptions import SpotifyException
 
 from backend.app.services.account_snapshot import (
     export_account_snapshot,
+    import_account_snapshot,
     preview_account_snapshot_import,
     summarize_snapshot,
 )
@@ -199,6 +200,75 @@ class AccountSnapshotTests(unittest.TestCase):
         self.assertEqual(
             snapshot["warnings"],
             ["Skipped playlist 'Locked Playlist' (locked-playlist) because Spotify denied access to its tracks."],
+        )
+
+    def test_import_snapshot_uses_generic_library_endpoints_for_library_content(self):
+        class LibraryImportFakeSpotify:
+            def __init__(self):
+                self._current_user = {"id": "target-user", "display_name": "Target User"}
+                self._saved_tracks = [{"track": {"id": "existing-track"}}]
+                self._saved_albums = [{"album": {"id": "existing-album"}}]
+                self._followed_artists = [{"id": "existing-artist"}]
+                self.put_calls: list[tuple[str, dict]] = []
+                self.delete_calls: list[tuple[str, dict]] = []
+
+            def current_user(self):
+                return self._current_user
+
+            def current_user_saved_tracks(self, limit=50, offset=0):
+                return {"items": self._saved_tracks[offset:offset + limit]}
+
+            def current_user_saved_albums(self, limit=50, offset=0):
+                return {"items": self._saved_albums[offset:offset + limit]}
+
+            def current_user_followed_artists(self, limit=50, after=None):
+                if after:
+                    return {"artists": {"items": [], "cursors": {}}}
+                return {"artists": {"items": self._followed_artists[:limit], "cursors": {"after": None}}}
+
+            def _put(self, url, args=None, payload=None, **kwargs):
+                self.put_calls.append((url, payload or {}))
+                return None
+
+            def _delete(self, url, args=None, payload=None, **kwargs):
+                self.delete_calls.append((url, payload or {}))
+                return None
+
+        snapshot = {
+            "liked_tracks": [{"uri": "spotify:track:new-track", "position": 0}],
+            "saved_albums": [{"uri": "spotify:album:new-album", "position": 0}],
+            "followed_artists": [{"id": "new-artist"}],
+        }
+        fake_spotify = LibraryImportFakeSpotify()
+
+        result = import_account_snapshot(
+            sp=fake_spotify,
+            snapshot=snapshot,
+            import_playlists=False,
+            clear_existing_before_import=True,
+        )
+
+        self.assertEqual(result["summary"]["liked_tracks_removed"], 1)
+        self.assertEqual(result["summary"]["saved_albums_removed"], 1)
+        self.assertEqual(result["summary"]["followed_artists_removed"], 1)
+        self.assertEqual(result["summary"]["liked_tracks_added"], 1)
+        self.assertEqual(result["summary"]["saved_albums_added"], 1)
+        self.assertEqual(result["summary"]["followed_artists_added"], 1)
+        self.assertEqual(
+            fake_spotify.delete_calls,
+            [
+                ("me/library", {"uris": ["spotify:track:existing-track"]}),
+                ("me/library", {"uris": ["spotify:album:existing-album"]}),
+                ("me/library", {"uris": ["spotify:artist:existing-artist"]}),
+            ],
+        )
+        self.assertEqual(
+            fake_spotify.put_calls,
+            [
+                ("me/library", {"uris": ["spotify:track:new-track"]}),
+                ("me/library", {"uris": ["spotify:album:new-album"]}),
+                ("me/library", {"uris": ["spotify:artist:new-artist"]}),
+            ],
         )
 
 

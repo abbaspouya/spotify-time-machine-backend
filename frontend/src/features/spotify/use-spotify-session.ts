@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
-import { getAuthStatus, getLoginUrl, getWhoAmI, logoutSpotify } from "@/lib/api"
+import { ApiError, getAuthStatus, getLoginUrl, getWhoAmI, logoutSpotify } from "@/lib/api"
 import type { SpotifyAccountRole } from "@/lib/types"
 
 export function formatExpiresAt(value?: number | null) {
@@ -12,6 +12,15 @@ export function formatExpiresAt(value?: number | null) {
 }
 
 export function getErrorMessage(error: unknown) {
+  if (error instanceof ApiError && error.status === 429) {
+    if (typeof error.retryAfterSeconds === "number" && Number.isFinite(error.retryAfterSeconds)) {
+      const seconds = Math.max(1, Math.round(error.retryAfterSeconds))
+      return `${error.message} Wait about ${seconds} second${seconds === 1 ? "" : "s"} before retrying.`
+    }
+
+    return `${error.message} Give it a short pause before retrying.`
+  }
+
   return error instanceof Error ? error.message : "Something went wrong."
 }
 
@@ -27,6 +36,8 @@ export function useSpotifySession(options: UseSpotifySessionOptions = {}) {
   const authStatusQuery = useQuery({
     queryKey: ["authStatus", accountRole],
     queryFn: () => getAuthStatus(accountRole),
+    staleTime: 2 * 60_000,
+    retry: false,
   })
 
   const isAuthenticated = authStatusQuery.data?.authenticated === true
@@ -35,6 +46,8 @@ export function useSpotifySession(options: UseSpotifySessionOptions = {}) {
     queryKey: ["whoami", accountRole],
     queryFn: () => getWhoAmI(accountRole),
     enabled: isAuthenticated,
+    staleTime: 5 * 60_000,
+    retry: false,
   })
 
   const handleSpotifyLogin = () => {

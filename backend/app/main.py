@@ -13,9 +13,11 @@ from .core.observability import (
     http_exception_handler,
     reset_request_id,
     set_request_id,
+    spotify_network_exception_handler,
     spotify_exception_handler,
     unhandled_exception_handler,
 )
+from requests.exceptions import RequestException
 
 app = FastAPI(
     title="Spotify API",
@@ -60,6 +62,7 @@ async def request_context_middleware(request: Request, call_next):
 
 app.add_exception_handler(HTTPException, http_exception_handler)
 app.add_exception_handler(SpotifyException, spotify_exception_handler)
+app.add_exception_handler(RequestException, spotify_network_exception_handler)
 app.add_exception_handler(Exception, unhandled_exception_handler)
 
 # Mount all Spotify-related endpoints at root ("/")

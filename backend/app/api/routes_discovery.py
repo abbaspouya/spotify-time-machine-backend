@@ -1,10 +1,12 @@
 from fastapi import APIRouter, HTTPException, Query, Request
 
 from ..core.auth import get_spotify_client
+from ..core.observability import get_logger
 from ..services.spotify_time_machine import search_artists
 from ..services.top_tracks import get_top_tracks_summary
 
 router = APIRouter(tags=["Discovery"])
+logger = get_logger("discovery")
 
 
 @router.get("/search_artists", summary="Search Spotify artists")
@@ -34,9 +36,19 @@ def top_tracks_endpoint(
     days: int | None = Query(None, ge=1, le=365, description="Required when timeframe=custom"),
     limit: int = Query(50, ge=1, le=50, description="Max number of tracks to return"),
 ):
+    logger.info(
+        "spotify_top_tracks_fetch_started",
+        extra={"method": request.method, "path": request.url.path, "timeframe": timeframe, "days": days, "limit": limit},
+    )
     sp = get_spotify_client(request)
 
     try:
-        return get_top_tracks_summary(sp, timeframe=timeframe, days=days, limit=limit)
+        result = get_top_tracks_summary(sp, timeframe=timeframe, days=days, limit=limit)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    logger.info(
+        "spotify_top_tracks_fetch_completed",
+        extra={"method": request.method, "path": request.url.path, "timeframe": timeframe, "days": days, "limit": limit},
+    )
+    return result

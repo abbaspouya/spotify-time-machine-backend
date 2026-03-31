@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from threading import Lock
+from threading import RLock
 from typing import Any
 import json
 import re
@@ -21,7 +21,8 @@ from .config import (
 
 
 _SESSION_ID_PATTERN = re.compile(r"^[A-Za-z0-9._-]{20,}$")
-_SESSION_LOCK = Lock()
+_PENDING_AUTH_STATE_PATTERN = re.compile(r"^[A-Za-z0-9._-]{20,}$")
+_SESSION_LOCK = RLock()
 ACCOUNT_ROLES = ("source", "target")
 DEFAULT_ACCOUNT_ROLE = "source"
 
@@ -40,6 +41,10 @@ def _session_file_path(session_id: str) -> Path:
 
 def _is_valid_session_id(session_id: str | None) -> bool:
     return bool(session_id and _SESSION_ID_PATTERN.fullmatch(session_id))
+
+
+def _is_valid_pending_auth_state(auth_state: str | None) -> bool:
+    return bool(auth_state and _PENDING_AUTH_STATE_PATTERN.fullmatch(auth_state))
 
 
 def _ensure_session_dir() -> None:
@@ -65,14 +70,15 @@ def _load_session_data(session_id: str) -> dict[str, Any] | None:
         return None
 
     path = _session_file_path(session_id)
-    if not path.exists():
-        return None
+    with _SESSION_LOCK:
+        if not path.exists():
+            return None
 
-    try:
-        raw = path.read_text(encoding="utf-8")
-        data = json.loads(raw)
-    except (OSError, json.JSONDecodeError):
-        return None
+        try:
+            raw = path.read_text(encoding="utf-8")
+            data = json.loads(raw)
+        except (OSError, json.JSONDecodeError):
+            return None
 
     if not isinstance(data, dict):
         return None
@@ -214,14 +220,25 @@ def has_any_token_info(session_id: str) -> bool:
     return any(isinstance(token_info, dict) and token_info for token_info in _get_account_tokens(data).values())
 
 
-def set_pending_auth(session_id: str, account_role: str, return_to: str | None = None) -> None:
+def set_pending_auth(
+    session_id: str,
+    account_role: str,
+    return_to: str | None = None,
+    frontend_origin: str | None = None,
+    auth_state: str | None = None,
+) -> None:
     data = _load_session_data(session_id) or {
         "created_at": _utc_now_iso(),
     }
-    data["pending_auth"] = {
+    pending_auth: dict[str, Any] = {
         "account_role": normalize_account_role(account_role),
         "return_to": return_to,
     }
+    if frontend_origin:
+        pending_auth["frontend_origin"] = frontend_origin
+    if auth_state:
+        pending_auth["auth_state"] = auth_state
+    data["pending_auth"] = pending_auth
     _save_session_data(session_id, data)
 
 
@@ -233,6 +250,38 @@ def pop_pending_auth(session_id: str) -> dict[str, Any] | None:
     pending_auth = data.pop("pending_auth", None)
     _save_session_data(session_id, data)
     return pending_auth if isinstance(pending_auth, dict) else None
+
+
+def find_session_id_by_pending_auth_state(auth_state: str | None) -> str | None:
+    if not _is_valid_pending_auth_state(auth_state):
+        return None
+
+    cleanup_expired_sessions()
+    _ensure_session_dir()
+
+    with _SESSION_LOCK:
+        for path in SESSION_DIR.glob("*.json"):
+            try:
+                raw = path.read_text(encoding="utf-8")
+                data = json.loads(raw)
+            except (OSError, json.JSONDecodeError):
+                continue
+
+            if not isinstance(data, dict):
+                continue
+
+            pending_auth = data.get("pending_auth")
+            if not isinstance(pending_auth, dict):
+                continue
+
+            if pending_auth.get("auth_state") != auth_state:
+                continue
+
+            session_id = path.stem
+            if _is_valid_session_id(session_id):
+                return session_id
+
+    return None
 
 
 def delete_session(session_id: str) -> None:

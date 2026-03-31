@@ -7,6 +7,7 @@ import logging
 
 from fastapi import HTTPException, Request
 from fastapi.responses import JSONResponse
+from requests.exceptions import RequestException, Timeout
 from spotipy.exceptions import SpotifyException
 
 from .config import LOG_LEVEL
@@ -25,7 +26,7 @@ class JsonLogFormatter(logging.Formatter):
             "request_id": getattr(record, "request_id", get_request_id()),
         }
 
-        for key in ("method", "path", "status_code", "duration_ms", "job_id", "job_kind"):
+        for key in ("method", "path", "status_code", "duration_ms", "job_id", "job_kind", "account_role", "timeframe", "days", "limit"):
             value = getattr(record, key, None)
             if value is not None:
                 payload[key] = value
@@ -102,6 +103,11 @@ async def http_exception_handler(request: Request, exc: HTTPException) -> JSONRe
 
 async def spotify_exception_handler(request: Request, exc: SpotifyException) -> JSONResponse:
     status_code = getattr(exc, "http_status", None) or 502
+    retry_after = None
+    if status_code == 429:
+        headers = getattr(exc, "headers", {}) or {}
+        retry_after = headers.get("Retry-After") or headers.get("retry-after")
+
     logger = get_logger("spotify_api")
     logger.warning(
         "spotify_api_error",
@@ -113,9 +119,43 @@ async def spotify_exception_handler(request: Request, exc: SpotifyException) -> 
         exc_info=exc,
     )
 
+    detail = "Spotify request failed. Refresh your connection and try again."
+    if status_code == 429:
+        detail = "Spotify is rate-limiting requests right now. Wait a moment and try again."
+        if retry_after:
+            detail = f"Spotify is rate-limiting requests right now. Try again in about {retry_after} seconds."
+
     response = JSONResponse(
         status_code=status_code,
-        content=_error_body("Spotify request failed. Refresh your connection and try again."),
+        content=_error_body(detail),
+    )
+    if retry_after:
+        response.headers["Retry-After"] = str(retry_after)
+    response.headers["X-Request-ID"] = get_request_id()
+    return response
+
+
+async def spotify_network_exception_handler(request: Request, exc: RequestException) -> JSONResponse:
+    status_code = 504 if isinstance(exc, Timeout) else 502
+    detail = (
+        "Spotify did not respond in time. Refresh your connection and try again."
+        if isinstance(exc, Timeout)
+        else "Spotify could not be reached. Try again in a moment."
+    )
+    logger = get_logger("spotify_api")
+    logger.warning(
+        "spotify_network_error",
+        extra={
+            "method": request.method,
+            "path": request.url.path,
+            "status_code": status_code,
+        },
+        exc_info=exc,
+    )
+
+    response = JSONResponse(
+        status_code=status_code,
+        content=_error_body(detail),
     )
     response.headers["X-Request-ID"] = get_request_id()
     return response

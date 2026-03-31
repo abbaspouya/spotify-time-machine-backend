@@ -11,13 +11,18 @@ import { cn } from "@/lib/utils"
 
 export function HomePage() {
   const { authStatusQuery, isAuthenticated, whoAmIQuery, handleSpotifyLogin, refreshSession } = useSpotifySession()
+  const canLoadTopTracks = isAuthenticated && whoAmIQuery.isSuccess
+  const topTracksBlockedError = whoAmIQuery.isError ? whoAmIQuery.error : null
 
   return (
     <div className="container space-y-8 py-8 md:py-12">
       <TopTracksRecap
         displayName={whoAmIQuery.data?.display_name || whoAmIQuery.data?.id}
         scope={authStatusQuery.data?.scope}
+        canLoad={canLoadTopTracks}
+        blockedError={topTracksBlockedError}
         onReconnect={handleSpotifyLogin}
+        onRetrySession={() => void refreshSession()}
       />
 
       <section className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
@@ -98,6 +103,12 @@ export function HomePage() {
             {authStatusQuery.isError ? (
               <p className="rounded-2xl border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive">
                 {getErrorMessage(authStatusQuery.error)}
+              </p>
+            ) : null}
+
+            {whoAmIQuery.isError ? (
+              <p className="rounded-2xl border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+                {getErrorMessage(whoAmIQuery.error)}
               </p>
             ) : null}
 

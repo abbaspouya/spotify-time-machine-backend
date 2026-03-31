@@ -11,8 +11,10 @@ def build_frontend_redirect(
     detail: str | None = None,
     account_role: str | None = None,
     return_to: str | None = None,
+    frontend_origin: str | None = None,
 ) -> str:
-    target = f"{FRONTEND_URL}{FRONTEND_AUTH_CALLBACK_PATH}"
+    base_url = (frontend_origin or FRONTEND_URL).rstrip("/")
+    target = f"{base_url}{FRONTEND_AUTH_CALLBACK_PATH}"
     params = {"status": status}
     if detail:
         params["detail"] = detail

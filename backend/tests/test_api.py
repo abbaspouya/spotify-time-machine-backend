@@ -1,8 +1,12 @@
 import os
 import unittest
 from time import time
+from urllib.parse import parse_qs, urlsplit
+from unittest.mock import patch
 
 from fastapi.testclient import TestClient
+from requests.exceptions import Timeout
+from spotipy.exceptions import SpotifyException
 
 
 os.environ.setdefault("SPOTIFY_CLIENT_ID", "test-client-id")
@@ -52,6 +56,48 @@ class ApiContractTests(unittest.TestCase):
         paths = response.json()["paths"]
         self.assertNotIn("/callback", paths)
         self.assertNotIn("/get_token", paths)
+
+    def test_whoami_uses_profile_schema_in_openapi(self):
+        response = self.client.get("/openapi.json")
+
+        self.assertEqual(response.status_code, 200)
+        whoami_schema = response.json()["paths"]["/whoami"]["get"]["responses"]["200"]["content"]["application/json"]["schema"]
+        self.assertEqual(whoami_schema["$ref"], "#/components/schemas/WhoAmIResponse")
+
+    def test_whoami_returns_gateway_timeout_when_spotify_does_not_respond(self):
+        class TimeoutSpotify:
+            def current_user(self):
+                raise Timeout("spotify timed out")
+
+        with patch("backend.app.api.routes_auth.get_spotify_client", return_value=TimeoutSpotify()):
+            response = self.client.get("/whoami")
+
+        self.assertEqual(response.status_code, 504)
+        self.assertEqual(
+            response.json()["detail"],
+            "Spotify did not respond in time. Refresh your connection and try again.",
+        )
+
+    def test_whoami_returns_retry_after_when_spotify_rate_limits(self):
+        class RateLimitedSpotify:
+            def current_user(self):
+                raise SpotifyException(
+                    429,
+                    -1,
+                    "Too Many Requests",
+                    reason="rate limited",
+                    headers={"Retry-After": "17"},
+                )
+
+        with patch("backend.app.api.routes_auth.get_spotify_client", return_value=RateLimitedSpotify()):
+            response = self.client.get("/whoami")
+
+        self.assertEqual(response.status_code, 429)
+        self.assertEqual(response.headers.get("Retry-After"), "17")
+        self.assertEqual(
+            response.json()["detail"],
+            "Spotify is rate-limiting requests right now. Try again in about 17 seconds.",
+        )
 
     def test_logout_clears_session_cookie(self):
         with TestClient(app) as client:
@@ -109,6 +155,63 @@ class ApiContractTests(unittest.TestCase):
             self.assertEqual(target_status_after_logout.json(), {"authenticated": False})
             self.assertEqual(source_status_after_logout.status_code, 200)
             self.assertTrue(source_status_after_logout.json()["authenticated"])
+
+    def test_callback_recovers_session_from_oauth_state_when_cookie_is_missing(self):
+        with TestClient(app) as original_client:
+            login_response = original_client.get(
+                "/login",
+                params={"raw": True, "return_to": "/app/transfer-library"},
+                headers={"referer": "http://localhost:5173/app/transfer-library"},
+            )
+
+            self.assertEqual(login_response.status_code, 200)
+            session_id = original_client.cookies.get(SESSION_COOKIE_NAME)
+            self.assertIsNotNone(session_id)
+
+            auth_url = login_response.json()["auth_url"]
+            state = parse_qs(urlsplit(auth_url).query)["state"][0]
+
+            token_info = {
+                "access_token": "test-access-token",
+                "token_type": "Bearer",
+                "scope": SPOTIFY_SCOPE,
+                "expires_at": int(time()) + 3600,
+            }
+
+            def fake_get_oauth_for_session(callback_session_id: str, account_role: str):
+                class FakeCacheHandler:
+                    def save_token_to_cache(self, value):
+                        save_token_info(callback_session_id, value, account_role)
+
+                class FakeOAuth:
+                    cache_handler = FakeCacheHandler()
+
+                    def get_access_token(self, code, as_dict=True):
+                        self.last_code = code
+                        self.last_as_dict = as_dict
+                        return token_info
+
+                return FakeOAuth()
+
+            with patch("backend.app.api.routes_auth.get_oauth_for_session", side_effect=fake_get_oauth_for_session):
+                with TestClient(app) as callback_client:
+                    callback_response = callback_client.get(
+                        "/callback",
+                        params={"code": "test-code", "state": state},
+                        follow_redirects=False,
+                    )
+
+            self.assertEqual(callback_response.status_code, 303)
+            self.assertTrue(
+                callback_response.headers["location"].startswith(
+                    "http://localhost:5173/auth/callback?status=success"
+                )
+            )
+
+            auth_status_response = original_client.get("/auth_status")
+
+            self.assertEqual(auth_status_response.status_code, 200)
+            self.assertTrue(auth_status_response.json()["authenticated"])
 
 
 if __name__ == "__main__":

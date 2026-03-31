@@ -102,6 +102,12 @@ def _uri_to_id(uri_or_id: str) -> str:
     return uri_or_id
 
 
+def _id_to_uri(entity_type: str, uri_or_id: str) -> str:
+    if ":" in uri_or_id:
+        return uri_or_id
+    return f"spotify:{entity_type}:{uri_or_id}"
+
+
 def _dedupe_preserve_order(items: list[str]) -> list[str]:
     seen: set[str] = set()
     out: list[str] = []
@@ -117,6 +123,18 @@ def _report_progress(callback: ProgressCallback | None, progress: int | None, me
         return
 
     callback(progress, message)
+
+
+def _save_items_to_library(sp: spotipy.Spotify, uris: list[str]) -> None:
+    if not uris:
+        return
+    sp._put("me/library", payload={"uris": uris})
+
+
+def _remove_items_from_library(sp: spotipy.Spotify, uris: list[str]) -> None:
+    if not uris:
+        return
+    sp._delete("me/library", payload={"uris": uris})
 
 
 def _build_account_identity(user: Any) -> dict[str, Any] | None:
@@ -639,50 +657,53 @@ def import_account_snapshot(
 
         if import_liked_tracks:
             existing_track_ids = _collect_saved_track_ids(sp)
-            for track_chunk in _chunk(existing_track_ids, 50):
+            existing_track_uris = [_id_to_uri("track", track_id) for track_id in existing_track_ids]
+            for track_chunk in _chunk(existing_track_uris, 50):
                 try:
-                    sp.current_user_saved_tracks_delete(track_chunk)
+                    _remove_items_from_library(sp, track_chunk)
                     result["summary"]["liked_tracks_removed"] += len(track_chunk)
                 except Exception:
-                    for track_id in track_chunk:
+                    for track_uri in track_chunk:
                         try:
-                            sp.current_user_saved_tracks_delete([track_id])
+                            _remove_items_from_library(sp, [track_uri])
                             result["summary"]["liked_tracks_removed"] += 1
                         except Exception:
                             result["warnings"].append(
-                                f"Failed to remove liked track before import: {track_id}"
+                                f"Failed to remove liked track before import: {_uri_to_id(track_uri)}"
                             )
 
         if import_saved_albums:
             existing_album_ids = _collect_saved_album_ids(sp)
-            for album_chunk in _chunk(existing_album_ids, 20):
+            existing_album_uris = [_id_to_uri("album", album_id) for album_id in existing_album_ids]
+            for album_chunk in _chunk(existing_album_uris, 50):
                 try:
-                    sp.current_user_saved_albums_delete(album_chunk)
+                    _remove_items_from_library(sp, album_chunk)
                     result["summary"]["saved_albums_removed"] += len(album_chunk)
                 except Exception:
-                    for album_id in album_chunk:
+                    for album_uri in album_chunk:
                         try:
-                            sp.current_user_saved_albums_delete([album_id])
+                            _remove_items_from_library(sp, [album_uri])
                             result["summary"]["saved_albums_removed"] += 1
                         except Exception:
                             result["warnings"].append(
-                                f"Failed to remove saved album before import: {album_id}"
+                                f"Failed to remove saved album before import: {_uri_to_id(album_uri)}"
                             )
 
         if import_followed_artists:
             existing_artist_ids = _collect_followed_artist_ids(sp)
-            for artist_chunk in _chunk(existing_artist_ids, 50):
+            existing_artist_uris = [_id_to_uri("artist", artist_id) for artist_id in existing_artist_ids]
+            for artist_chunk in _chunk(existing_artist_uris, 50):
                 try:
-                    sp.user_unfollow_artists(artist_chunk)
+                    _remove_items_from_library(sp, artist_chunk)
                     result["summary"]["followed_artists_removed"] += len(artist_chunk)
                 except Exception:
-                    for artist_id in artist_chunk:
+                    for artist_uri in artist_chunk:
                         try:
-                            sp.user_unfollow_artists([artist_id])
+                            _remove_items_from_library(sp, [artist_uri])
                             result["summary"]["followed_artists_removed"] += 1
                         except Exception:
                             result["warnings"].append(
-                                f"Failed to unfollow artist before import: {artist_id}"
+                                f"Failed to unfollow artist before import: {_uri_to_id(artist_uri)}"
                             )
 
     if import_playlists:
@@ -757,31 +778,31 @@ def import_account_snapshot(
         if isinstance(liked_entries, list):
             ordered_liked_entries = _order_entries_by_position(liked_entries)
             liked_uris = _normalize_uri_entries(ordered_liked_entries)
-            liked_ids = _dedupe_preserve_order([_uri_to_id(uri) for uri in liked_uris if uri])
+            liked_track_uris = _dedupe_preserve_order([_id_to_uri("track", uri) for uri in liked_uris if uri])
             if _entries_look_newest_first(ordered_liked_entries):
                 # Spotify "Liked Songs" is shown newest-first, so we add oldest-first
                 # to preserve the original visible order after import.
-                liked_ids = list(reversed(liked_ids))
+                liked_track_uris = list(reversed(liked_track_uris))
 
             if strict_liked_order:
                 result["warnings"].append(
                     "strict_liked_order is enabled: importing liked songs one-by-one for better ordering; this is slower."
                 )
-                for track_id in liked_ids:
+                for track_uri in liked_track_uris:
                     try:
-                        sp.current_user_saved_tracks_add([track_id])
+                        _save_items_to_library(sp, [track_uri])
                         result["summary"]["liked_tracks_added"] += 1
                     except Exception:
                         result["summary"]["liked_tracks_failed"] += 1
             else:
-                for chunk_ids in _chunk(liked_ids, 50):
+                for chunk_uris in _chunk(liked_track_uris, 50):
                     try:
-                        sp.current_user_saved_tracks_add(chunk_ids)
-                        result["summary"]["liked_tracks_added"] += len(chunk_ids)
+                        _save_items_to_library(sp, chunk_uris)
+                        result["summary"]["liked_tracks_added"] += len(chunk_uris)
                     except Exception:
-                        for track_id in chunk_ids:
+                        for track_uri in chunk_uris:
                             try:
-                                sp.current_user_saved_tracks_add([track_id])
+                                _save_items_to_library(sp, [track_uri])
                                 result["summary"]["liked_tracks_added"] += 1
                             except Exception:
                                 result["summary"]["liked_tracks_failed"] += 1
@@ -792,19 +813,19 @@ def import_account_snapshot(
         if isinstance(album_entries, list):
             ordered_album_entries = _order_entries_by_position(album_entries)
             album_uris = _normalize_uri_entries(ordered_album_entries)
-            album_ids = _dedupe_preserve_order([_uri_to_id(uri) for uri in album_uris if uri])
+            normalized_album_uris = _dedupe_preserve_order([_id_to_uri("album", uri) for uri in album_uris if uri])
             if _entries_look_newest_first(ordered_album_entries):
                 # Saved albums are typically displayed newest-first as well.
-                album_ids = list(reversed(album_ids))
+                normalized_album_uris = list(reversed(normalized_album_uris))
 
-            for chunk_ids in _chunk(album_ids, 20):
+            for chunk_uris in _chunk(normalized_album_uris, 50):
                 try:
-                    sp.current_user_saved_albums_add(chunk_ids)
-                    result["summary"]["saved_albums_added"] += len(chunk_ids)
+                    _save_items_to_library(sp, chunk_uris)
+                    result["summary"]["saved_albums_added"] += len(chunk_uris)
                 except Exception:
-                    for album_id in chunk_ids:
+                    for album_uri in chunk_uris:
                         try:
-                            sp.current_user_saved_albums_add([album_id])
+                            _save_items_to_library(sp, [album_uri])
                             result["summary"]["saved_albums_added"] += 1
                         except Exception:
                             result["summary"]["saved_albums_failed"] += 1
@@ -813,28 +834,28 @@ def import_account_snapshot(
         _report_progress(progress_callback, 92, "Restoring followed artists")
         artist_entries = snapshot.get("followed_artists", [])
         if isinstance(artist_entries, list):
-            artist_ids: list[str] = []
+            artist_uris: list[str] = []
             for entry in artist_entries:
                 if isinstance(entry, dict):
                     artist_id = entry.get("id")
                     artist_uri = entry.get("uri")
                     if isinstance(artist_id, str) and artist_id:
-                        artist_ids.append(artist_id)
+                        artist_uris.append(_id_to_uri("artist", artist_id))
                     elif isinstance(artist_uri, str) and artist_uri:
-                        artist_ids.append(_uri_to_id(artist_uri))
+                        artist_uris.append(_id_to_uri("artist", artist_uri))
                 elif isinstance(entry, str) and entry:
-                    artist_ids.append(_uri_to_id(entry))
+                    artist_uris.append(_id_to_uri("artist", entry))
 
-            artist_ids = _dedupe_preserve_order(artist_ids)
+            artist_uris = _dedupe_preserve_order(artist_uris)
 
-            for chunk_ids in _chunk(artist_ids, 50):
+            for chunk_uris in _chunk(artist_uris, 50):
                 try:
-                    sp.user_follow_artists(chunk_ids)
-                    result["summary"]["followed_artists_added"] += len(chunk_ids)
+                    _save_items_to_library(sp, chunk_uris)
+                    result["summary"]["followed_artists_added"] += len(chunk_uris)
                 except Exception:
-                    for artist_id in chunk_ids:
+                    for artist_uri in chunk_uris:
                         try:
-                            sp.user_follow_artists([artist_id])
+                            _save_items_to_library(sp, [artist_uri])
                             result["summary"]["followed_artists_added"] += 1
                         except Exception:
                             result["summary"]["followed_artists_failed"] += 1

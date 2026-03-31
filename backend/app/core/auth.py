@@ -3,7 +3,13 @@ import spotipy
 from spotipy.cache_handler import CacheHandler
 from spotipy.oauth2 import SpotifyOAuth
 
-from .config import SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET, SPOTIFY_REDIRECT_URI, SPOTIFY_SCOPE
+from .config import (
+    SPOTIFY_CLIENT_ID,
+    SPOTIFY_CLIENT_SECRET,
+    SPOTIFY_REDIRECT_URI,
+    SPOTIFY_REQUEST_TIMEOUT_SECONDS,
+    SPOTIFY_SCOPE,
+)
 from .session_store import (
     DEFAULT_ACCOUNT_ROLE,
     get_session_id_from_request,
@@ -44,6 +50,7 @@ def get_oauth_for_session(session_id: str, account_role: str = DEFAULT_ACCOUNT_R
         redirect_uri=SPOTIFY_REDIRECT_URI,
         cache_handler=SessionCacheHandler(session_id, normalized_role),
         scope=SPOTIFY_SCOPE,
+        requests_timeout=SPOTIFY_REQUEST_TIMEOUT_SECONDS,
     )
 
 
@@ -89,7 +96,12 @@ def get_spotify_client_for_session(
         raise HTTPException(status_code=401, detail="No Spotify token found. Go to /login first.")
 
     access_token = token_info["access_token"]
-    return spotipy.Spotify(auth=access_token)
+    return spotipy.Spotify(
+        auth=access_token,
+        requests_timeout=SPOTIFY_REQUEST_TIMEOUT_SECONDS,
+        retries=0,
+        status_retries=0,
+    )
 
 
 def get_spotify_client(

@@ -40,10 +40,20 @@ function formatWindowMeta(days?: number | null) {
 type TopTracksRecapProps = {
   displayName?: string | null
   scope?: string | null
+  canLoad?: boolean
+  blockedError?: unknown
   onReconnect: () => void
+  onRetrySession?: () => void
 }
 
-export function TopTracksRecap({ displayName, scope, onReconnect }: TopTracksRecapProps) {
+export function TopTracksRecap({
+  displayName,
+  scope,
+  canLoad = true,
+  blockedError,
+  onReconnect,
+  onRetrySession,
+}: TopTracksRecapProps) {
   const [request, setRequest] = useState<TopTracksRequest>({ timeframe: "4_weeks", limit: 50 })
   const [customDaysInput, setCustomDaysInput] = useState("14")
   const [customError, setCustomError] = useState<string | null>(null)
@@ -53,7 +63,9 @@ export function TopTracksRecap({ displayName, scope, onReconnect }: TopTracksRec
   const topTracksQuery = useQuery({
     queryKey: ["topTracks", request.timeframe, request.days ?? null, request.limit ?? 50],
     queryFn: () => getTopTracks(request),
-    enabled: topTracksEnabled,
+    enabled: topTracksEnabled && canLoad,
+    staleTime: 5 * 60_000,
+    retry: false,
   })
 
   const selectedLabel =
@@ -163,6 +175,32 @@ export function TopTracksRecap({ displayName, scope, onReconnect }: TopTracksRec
                   </p>
                 </div>
                 <Button onClick={onReconnect}>Reconnect Spotify</Button>
+              </div>
+            </div>
+          ) : !canLoad ? (
+            <div className="rounded-[30px] border border-white/10 bg-white/5 p-5">
+              <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                <div className="space-y-2">
+                  <p className="text-lg font-semibold text-foreground">
+                    {blockedError ? "Top songs are waiting on your Spotify profile." : "Confirming your Spotify profile first."}
+                  </p>
+                  <p className={cn("text-sm", blockedError ? "text-destructive" : "text-muted-foreground")}>
+                    {blockedError
+                      ? getErrorMessage(blockedError)
+                      : "Once the active account finishes loading, the dashboard will request top songs."}
+                  </p>
+                </div>
+                {blockedError ? (
+                  <Button variant="outline" onClick={onRetrySession}>
+                    <RefreshCcw className="h-4 w-4" />
+                    Retry session
+                  </Button>
+                ) : (
+                  <div className="flex items-center gap-3 text-sm text-muted-foreground">
+                    <LoaderCircle className="h-4 w-4 animate-spin" />
+                    Loading profile
+                  </div>
+                )}
               </div>
             </div>
           ) : topTracksQuery.isPending ? (

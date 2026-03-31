@@ -19,17 +19,22 @@ import type {
   WhoAmI,
 } from "@/lib/types"
 
-const fallbackBaseUrl = "http://127.0.0.1:8000"
+const fallbackBaseUrl =
+  typeof window === "undefined"
+    ? "http://127.0.0.1:8000"
+    : `${window.location.protocol}//${window.location.hostname}:8000`
 
 export const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || fallbackBaseUrl).replace(/\/$/, "")
 
 export class ApiError extends Error {
   status: number
+  retryAfterSeconds?: number
 
-  constructor(status: number, message: string) {
+  constructor(status: number, message: string, retryAfterSeconds?: number) {
     super(message)
     this.name = "ApiError"
     this.status = status
+    this.retryAfterSeconds = retryAfterSeconds
   }
 }
 
@@ -64,6 +69,11 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     : await response.text()
 
   if (!response.ok) {
+    const retryAfterHeader = response.headers.get("retry-after")
+    const retryAfterSeconds =
+      retryAfterHeader && /^\d+$/.test(retryAfterHeader.trim())
+        ? Number(retryAfterHeader.trim())
+        : undefined
     const requestId =
       typeof payload === "object" && payload !== null && "request_id" in payload
         ? String(payload.request_id)
@@ -76,7 +86,11 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
           ? payload
           : "Request failed"
 
-    throw new ApiError(response.status, requestId ? `${message} (Request ID: ${requestId})` : message)
+    throw new ApiError(
+      response.status,
+      requestId ? `${message} (Request ID: ${requestId})` : message,
+      retryAfterSeconds,
+    )
   }
 
   return payload as T
