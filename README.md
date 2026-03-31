@@ -54,7 +54,7 @@ Backend:
 
 ```powershell
 python -m venv .venv
-.\.venv\Scripts\Activate.ps1
+.\.venv\Scripts\Activate.ps1 ( this one is to activate venv )
 pip install -r backend/requirements.txt
 ```
 
