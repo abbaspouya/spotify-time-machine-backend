@@ -10,13 +10,20 @@ import re
 import spotipy
 from spotipy.exceptions import SpotifyException
 
-from .spotify_playlists import add_items_to_playlist, create_current_user_playlist
+from ..core.observability import get_logger
+from .spotify_playlists import (
+    add_items_to_playlist,
+    create_current_user_playlist,
+    get_playlist_items_page,
+    get_playlist_track_object,
+)
 
 
 BACKEND_DIR = Path(__file__).resolve().parents[2]
 PROJECT_ROOT = BACKEND_DIR.parent
 EXPORT_DIR = BACKEND_DIR / "exports"
 ProgressCallback = Callable[[int | None, str], None]
+logger = get_logger("snapshots")
 
 
 def _parse_iso_datetime(value: str) -> datetime:
@@ -398,13 +405,26 @@ def export_account_snapshot(
                     "position": len(snapshot["playlists"]),
                     "tracks": [],
                 }
+                logger.info(
+                    "snapshot_playlist_export_started",
+                    extra={
+                        "playlist_id": playlist_id,
+                        "playlist_name": exported_playlist["name"],
+                    },
+                )
 
                 playlist_offset = 0
                 skip_playlist = False
+                fetched_item_count = 0
+                skipped_cutoff_count = 0
+                skipped_local_count = 0
+                skipped_missing_uri_count = 0
+                skipped_missing_track_count = 0
                 while True:
                     try:
                         # Snapshot imports only support tracks, so request tracks explicitly.
-                        tracks_page = sp.playlist_items(
+                        tracks_page = get_playlist_items_page(
+                            sp,
                             playlist_id,
                             limit=100,
                             offset=playlist_offset,
@@ -413,6 +433,18 @@ def export_account_snapshot(
                     except SpotifyException as exc:
                         if getattr(exc, "http_status", None) == 403:
                             playlist_name = exported_playlist["name"] or playlist_id
+                            logger.warning(
+                                "snapshot_playlist_export_skipped_forbidden",
+                                extra={
+                                    "playlist_id": playlist_id,
+                                    "playlist_name": playlist_name,
+                                    "offset": playlist_offset,
+                                    "spotify_error_code": getattr(exc, "code", None),
+                                    "spotify_error_reason": getattr(exc, "reason", None),
+                                    "spotify_error_message": getattr(exc, "msg", None),
+                                },
+                                exc_info=exc,
+                            )
                             snapshot["warnings"].append(
                                 f"Skipped playlist '{playlist_name}' ({playlist_id}) because Spotify denied access to its tracks."
                             )
@@ -424,17 +456,24 @@ def export_account_snapshot(
                     if not track_items:
                         break
 
+                    fetched_item_count += len(track_items)
                     for track_item in track_items:
                         added_at = track_item.get("added_at")
                         if not _is_before_cutoff(added_at, cutoff_dt):
+                            skipped_cutoff_count += 1
                             continue
 
-                        track = track_item.get("track")
-                        if not isinstance(track, dict) or track.get("is_local"):
+                        track = get_playlist_track_object(track_item)
+                        if track is None or track.get("is_local"):
+                            if track is None:
+                                skipped_missing_track_count += 1
+                            else:
+                                skipped_local_count += 1
                             continue
 
                         uri = track.get("uri")
                         if not isinstance(uri, str) or not uri:
+                            skipped_missing_uri_count += 1
                             continue
 
                         exported_playlist["tracks"].append(
@@ -452,6 +491,19 @@ def export_account_snapshot(
                 if skip_playlist:
                     continue
 
+                logger.info(
+                    "snapshot_playlist_export_completed",
+                    extra={
+                        "playlist_id": playlist_id,
+                        "playlist_name": exported_playlist["name"],
+                        "fetched_item_count": fetched_item_count,
+                        "exported_track_count": len(exported_playlist["tracks"]),
+                        "skipped_cutoff_count": skipped_cutoff_count,
+                        "skipped_local_count": skipped_local_count,
+                        "skipped_missing_uri_count": skipped_missing_uri_count,
+                        "skipped_missing_track_count": skipped_missing_track_count,
+                    },
+                )
                 snapshot["playlists"].append(exported_playlist)
 
             offset += len(items)

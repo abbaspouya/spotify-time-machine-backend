@@ -26,7 +26,32 @@ class JsonLogFormatter(logging.Formatter):
             "request_id": getattr(record, "request_id", get_request_id()),
         }
 
-        for key in ("method", "path", "status_code", "duration_ms", "job_id", "job_kind", "account_role", "timeframe", "days", "limit"):
+        for key in (
+            "method",
+            "path",
+            "status_code",
+            "duration_ms",
+            "job_id",
+            "job_kind",
+            "account_role",
+            "timeframe",
+            "days",
+            "limit",
+            "playlist_id",
+            "playlist_name",
+            "playlist_count",
+            "track_count",
+            "offset",
+            "spotify_error_code",
+            "spotify_error_reason",
+            "spotify_error_message",
+            "fetched_item_count",
+            "exported_track_count",
+            "skipped_cutoff_count",
+            "skipped_local_count",
+            "skipped_missing_uri_count",
+            "skipped_missing_track_count",
+        ):
             value = getattr(record, key, None)
             if value is not None:
                 payload[key] = value
@@ -84,16 +109,29 @@ def _error_body(detail: str) -> dict[str, str]:
     }
 
 
+def _request_log_context(request: Request) -> dict[str, Any]:
+    context: dict[str, Any] = {
+        "method": request.method,
+        "path": request.url.path,
+    }
+
+    account_role = request.query_params.get("account_role")
+    if account_role:
+        context["account_role"] = account_role
+
+    playlist_id = request.path_params.get("playlist_id")
+    if isinstance(playlist_id, str) and playlist_id:
+        context["playlist_id"] = playlist_id
+
+    return context
+
+
 async def http_exception_handler(request: Request, exc: HTTPException) -> JSONResponse:
     logger = get_logger("http")
     log_method = logger.warning if exc.status_code >= 500 else logger.info
     log_method(
         "http_exception",
-        extra={
-            "method": request.method,
-            "path": request.url.path,
-            "status_code": exc.status_code,
-        },
+        extra={**_request_log_context(request), "status_code": exc.status_code},
     )
 
     response = JSONResponse(status_code=exc.status_code, content=_error_body(str(exc.detail)))
@@ -112,9 +150,11 @@ async def spotify_exception_handler(request: Request, exc: SpotifyException) -> 
     logger.warning(
         "spotify_api_error",
         extra={
-            "method": request.method,
-            "path": request.url.path,
+            **_request_log_context(request),
             "status_code": status_code,
+            "spotify_error_code": getattr(exc, "code", None),
+            "spotify_error_reason": getattr(exc, "reason", None),
+            "spotify_error_message": getattr(exc, "msg", None),
         },
         exc_info=exc,
     )
@@ -145,11 +185,7 @@ async def spotify_network_exception_handler(request: Request, exc: RequestExcept
     logger = get_logger("spotify_api")
     logger.warning(
         "spotify_network_error",
-        extra={
-            "method": request.method,
-            "path": request.url.path,
-            "status_code": status_code,
-        },
+        extra={**_request_log_context(request), "status_code": status_code},
         exc_info=exc,
     )
 
@@ -165,11 +201,7 @@ async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONR
     logger = get_logger("http")
     logger.exception(
         "unhandled_exception",
-        extra={
-            "method": request.method,
-            "path": request.url.path,
-            "status_code": 500,
-        },
+        extra={**_request_log_context(request), "status_code": 500},
     )
 
     response = JSONResponse(

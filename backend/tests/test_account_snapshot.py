@@ -73,7 +73,7 @@ class ExportFakeSpotify:
             {"id": "good-playlist", "name": "Good Playlist", "description": "", "public": False, "collaborative": False},
             {"id": "locked-playlist", "name": "Locked Playlist", "description": "", "public": False, "collaborative": False},
         ]
-        self.additional_types_seen: list[tuple[str, ...] | tuple[str]] = []
+        self.additional_types_seen: list[str] = []
 
     def current_user(self):
         return self._current_user
@@ -81,10 +81,18 @@ class ExportFakeSpotify:
     def current_user_playlists(self, limit=50, offset=0):
         return {"items": self._playlists[offset:offset + limit]}
 
-    def playlist_items(self, playlist_id, limit=100, offset=0, additional_types=("track", "episode")):
-        self.additional_types_seen.append(tuple(additional_types))
-        if tuple(additional_types) != ("track",):
-            raise AssertionError(f"Unexpected additional_types: {additional_types}")
+    def _get_id(self, item_type, item_id):
+        if item_type != "playlist":
+            raise AssertionError(f"Unexpected item_type: {item_type}")
+        return item_id
+
+    def _get(self, url, args=None, payload=None, **kwargs):
+        self.additional_types_seen.append(kwargs.get("additional_types"))
+        if kwargs.get("additional_types") != "track":
+            raise AssertionError(f"Unexpected additional_types: {kwargs.get('additional_types')}")
+
+        playlist_id = url.split("/")[1]
+        offset = kwargs.get("offset", 0)
 
         if playlist_id == "locked-playlist":
             raise SpotifyException(403, -1, "Forbidden")
@@ -96,7 +104,7 @@ class ExportFakeSpotify:
             "items": [
                 {
                     "added_at": "2024-01-01T00:00:00Z",
-                    "track": {"uri": "spotify:track:good-track", "is_local": False},
+                    "item": {"uri": "spotify:track:good-track", "is_local": False, "type": "track"},
                 }
             ]
         }
@@ -193,7 +201,7 @@ class AccountSnapshotTests(unittest.TestCase):
             include_followed_artists=False,
         )
 
-        self.assertEqual(fake_spotify.additional_types_seen, [("track",), ("track",)])
+        self.assertEqual(fake_spotify.additional_types_seen, ["track", "track"])
         self.assertEqual(snapshot["counts"]["playlists"], 1)
         self.assertEqual(snapshot["counts"]["playlist_tracks"], 1)
         self.assertEqual(snapshot["playlists"][0]["id"], "good-playlist")

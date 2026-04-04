@@ -1,8 +1,18 @@
 from fastapi import APIRouter, HTTPException, Query, Request
 
-from ..core.auth import get_spotify_client
-from ..schemas.playlist import CreateLanguagePlaylistRequest, CreatePlaylistRequest
-from ..services.spotify_playlists import create_current_user_playlist
+from ..core.auth import DEFAULT_ACCOUNT_ROLE, get_spotify_client, normalize_account_role
+from ..core.observability import get_logger
+from ..schemas.playlist import (
+    CreateLanguagePlaylistRequest,
+    CreatePlaylistRequest,
+    CurrentUserPlaylistsResponse,
+    PlaylistTracksResponse,
+)
+from ..services.spotify_playlists import (
+    create_current_user_playlist,
+    get_playlist_tracks,
+    list_current_user_playlists,
+)
 from ..services.spotify_time_machine import (
     add_tracks_in_chunks,
     fetch_all_liked_songs,
@@ -11,6 +21,73 @@ from ..services.spotify_time_machine import (
 )
 
 router = APIRouter(tags=["Playlists"])
+logger = get_logger("playlists")
+
+
+@router.get(
+    "/playlists",
+    response_model=CurrentUserPlaylistsResponse,
+    summary="List playlists for the connected Spotify account",
+)
+def get_current_user_playlists(
+    request: Request,
+    account_role: str = Query(DEFAULT_ACCOUNT_ROLE, description="Spotify account slot: source or target."),
+):
+    normalized_role = normalize_account_role(account_role)
+    logger.info(
+        "spotify_playlists_fetch_started",
+        extra={"method": request.method, "path": request.url.path, "account_role": normalized_role},
+    )
+    sp = get_spotify_client(request, normalized_role)
+    playlists = list_current_user_playlists(sp)
+    logger.info(
+        "spotify_playlists_fetch_completed",
+        extra={
+            "method": request.method,
+            "path": request.url.path,
+            "account_role": normalized_role,
+            "playlist_count": len(playlists),
+        },
+    )
+    return {
+        "playlists": playlists,
+        "total_playlists": len(playlists),
+    }
+
+
+@router.get(
+    "/playlists/{playlist_id}/tracks",
+    response_model=PlaylistTracksResponse,
+    summary="List songs inside a selected playlist",
+)
+def get_tracks_for_playlist(
+    playlist_id: str,
+    request: Request,
+    account_role: str = Query(DEFAULT_ACCOUNT_ROLE, description="Spotify account slot: source or target."),
+):
+    normalized_role = normalize_account_role(account_role)
+    logger.info(
+        "spotify_playlist_tracks_fetch_started",
+        extra={
+            "method": request.method,
+            "path": request.url.path,
+            "account_role": normalized_role,
+            "playlist_id": playlist_id,
+        },
+    )
+    sp = get_spotify_client(request, normalized_role)
+    result = get_playlist_tracks(sp, playlist_id)
+    logger.info(
+        "spotify_playlist_tracks_fetch_completed",
+        extra={
+            "method": request.method,
+            "path": request.url.path,
+            "account_role": normalized_role,
+            "playlist_id": playlist_id,
+            "track_count": result["total_tracks"],
+        },
+    )
+    return result
 
 
 @router.get("/fetch_and_group", summary="Group liked songs by time period")
