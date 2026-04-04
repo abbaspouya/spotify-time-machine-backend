@@ -25,6 +25,9 @@ const fallbackBaseUrl =
     : `${window.location.protocol}//${window.location.hostname}:8000`
 
 export const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || fallbackBaseUrl).replace(/\/$/, "")
+const SPOTIFY_RATE_LIMIT_STORAGE_KEY = "spotify_api_rate_limit_until"
+const SPOTIFY_RATE_LIMIT_EVENT = "spotify-rate-limit-updated"
+const DEFAULT_SPOTIFY_RATE_LIMIT_COOLDOWN_SECONDS = 60
 
 export class ApiError extends Error {
   status: number
@@ -36,6 +39,67 @@ export class ApiError extends Error {
     this.status = status
     this.retryAfterSeconds = retryAfterSeconds
   }
+}
+
+function dispatchSpotifyRateLimitEvent() {
+  if (typeof window === "undefined") {
+    return
+  }
+
+  window.dispatchEvent(new Event(SPOTIFY_RATE_LIMIT_EVENT))
+}
+
+export function getSpotifyRateLimitUntil() {
+  if (typeof window === "undefined") {
+    return null
+  }
+
+  const rawValue = window.sessionStorage.getItem(SPOTIFY_RATE_LIMIT_STORAGE_KEY)
+  if (!rawValue) {
+    return null
+  }
+
+  const parsed = Number(rawValue)
+  if (!Number.isFinite(parsed) || parsed <= Date.now()) {
+    window.sessionStorage.removeItem(SPOTIFY_RATE_LIMIT_STORAGE_KEY)
+    return null
+  }
+
+  return parsed
+}
+
+export function getSpotifyRateLimitRemainingSeconds() {
+  const until = getSpotifyRateLimitUntil()
+  if (!until) {
+    return null
+  }
+
+  return Math.max(1, Math.ceil((until - Date.now()) / 1000))
+}
+
+export function setSpotifyRateLimitCooldown(retryAfterSeconds?: number) {
+  if (typeof window === "undefined") {
+    return
+  }
+
+  const cooldownSeconds =
+    typeof retryAfterSeconds === "number" && Number.isFinite(retryAfterSeconds) && retryAfterSeconds > 0
+      ? retryAfterSeconds
+      : DEFAULT_SPOTIFY_RATE_LIMIT_COOLDOWN_SECONDS
+  const nextUntil = Date.now() + cooldownSeconds * 1000
+  const existingUntil = getSpotifyRateLimitUntil()
+  const effectiveUntil = existingUntil && existingUntil > nextUntil ? existingUntil : nextUntil
+  window.sessionStorage.setItem(SPOTIFY_RATE_LIMIT_STORAGE_KEY, String(effectiveUntil))
+  dispatchSpotifyRateLimitEvent()
+}
+
+export function clearSpotifyRateLimitCooldown() {
+  if (typeof window === "undefined") {
+    return
+  }
+
+  window.sessionStorage.removeItem(SPOTIFY_RATE_LIMIT_STORAGE_KEY)
+  dispatchSpotifyRateLimitEvent()
 }
 
 function buildQuery(params: Record<string, string | number | undefined>) {
@@ -54,6 +118,8 @@ function buildQuery(params: Record<string, string | number | undefined>) {
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  getSpotifyRateLimitUntil()
+
   const response = await fetch(`${API_BASE_URL}${path}`, {
     credentials: "include",
     ...init,
@@ -85,6 +151,10 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
         : typeof payload === "string"
           ? payload
           : "Request failed"
+
+    if (response.status === 429) {
+      setSpotifyRateLimitCooldown(retryAfterSeconds)
+    }
 
     throw new ApiError(
       response.status,

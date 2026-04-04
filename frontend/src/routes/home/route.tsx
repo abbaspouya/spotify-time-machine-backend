@@ -10,9 +10,9 @@ import { getDocsUrl } from "@/lib/api"
 import { cn } from "@/lib/utils"
 
 export function HomePage() {
-  const { authStatusQuery, isAuthenticated, whoAmIQuery, handleSpotifyLogin, refreshSession } = useSpotifySession()
-  const canLoadTopTracks = isAuthenticated && whoAmIQuery.isSuccess
-  const topTracksBlockedError = whoAmIQuery.isError ? whoAmIQuery.error : null
+  const { authStatusQuery, isAuthenticated, whoAmIQuery, spotifyRateLimit, handleSpotifyLogin, refreshSession } = useSpotifySession()
+  const canLoadTopTracks = isAuthenticated && whoAmIQuery.isSuccess && !spotifyRateLimit.isRateLimited
+  const topTracksBlockedError = whoAmIQuery.isError ? whoAmIQuery.error : spotifyRateLimit.error
 
   return (
     <div className="container space-y-8 py-8 md:py-12">
@@ -109,6 +109,10 @@ export function HomePage() {
             {whoAmIQuery.isError ? (
               <p className="rounded-2xl border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive">
                 {getErrorMessage(whoAmIQuery.error)}
+              </p>
+            ) : spotifyRateLimit.error ? (
+              <p className="rounded-2xl border border-destructive/20 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+                {getErrorMessage(spotifyRateLimit.error)}
               </p>
             ) : null}
 

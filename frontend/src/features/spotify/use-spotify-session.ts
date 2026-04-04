@@ -1,6 +1,7 @@
+import { useEffect, useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
-import { ApiError, getAuthStatus, getLoginUrl, getWhoAmI, logoutSpotify } from "@/lib/api"
+import { ApiError, getAuthStatus, getLoginUrl, getSpotifyRateLimitRemainingSeconds, getSpotifyRateLimitUntil, getWhoAmI, logoutSpotify } from "@/lib/api"
 import type { SpotifyAccountRole } from "@/lib/types"
 
 export function formatExpiresAt(value?: number | null) {
@@ -24,6 +25,55 @@ export function getErrorMessage(error: unknown) {
   return error instanceof Error ? error.message : "Something went wrong."
 }
 
+export function useSpotifyApiRateLimit() {
+  const [rateLimitUntil, setRateLimitUntil] = useState<number | null>(() => getSpotifyRateLimitUntil())
+
+  useEffect(() => {
+    const syncRateLimit = () => {
+      setRateLimitUntil(getSpotifyRateLimitUntil())
+    }
+
+    syncRateLimit()
+    window.addEventListener("spotify-rate-limit-updated", syncRateLimit)
+    return () => {
+      window.removeEventListener("spotify-rate-limit-updated", syncRateLimit)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!rateLimitUntil) {
+      return
+    }
+
+    const remainingMs = rateLimitUntil - Date.now()
+    if (remainingMs <= 0) {
+      setRateLimitUntil(getSpotifyRateLimitUntil())
+      return
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      setRateLimitUntil(getSpotifyRateLimitUntil())
+    }, remainingMs + 100)
+
+    return () => {
+      window.clearTimeout(timeoutId)
+    }
+  }, [rateLimitUntil])
+
+  const retryAfterSeconds = getSpotifyRateLimitRemainingSeconds()
+  const error =
+    typeof retryAfterSeconds === "number"
+      ? new ApiError(429, "Spotify is rate-limiting requests right now.", retryAfterSeconds)
+      : null
+
+  return {
+    isRateLimited: typeof retryAfterSeconds === "number",
+    retryAfterSeconds,
+    rateLimitUntil,
+    error,
+  }
+}
+
 type UseSpotifySessionOptions = {
   accountRole?: SpotifyAccountRole
   returnTo?: string
@@ -32,6 +82,7 @@ type UseSpotifySessionOptions = {
 export function useSpotifySession(options: UseSpotifySessionOptions = {}) {
   const queryClient = useQueryClient()
   const accountRole = options.accountRole ?? "source"
+  const spotifyRateLimit = useSpotifyApiRateLimit()
 
   const authStatusQuery = useQuery({
     queryKey: ["authStatus", accountRole],
@@ -45,7 +96,7 @@ export function useSpotifySession(options: UseSpotifySessionOptions = {}) {
   const whoAmIQuery = useQuery({
     queryKey: ["whoami", accountRole],
     queryFn: () => getWhoAmI(accountRole),
-    enabled: isAuthenticated,
+    enabled: isAuthenticated && !spotifyRateLimit.isRateLimited,
     staleTime: 5 * 60_000,
     retry: false,
   })
@@ -78,6 +129,7 @@ export function useSpotifySession(options: UseSpotifySessionOptions = {}) {
     authStatusQuery,
     isAuthenticated,
     whoAmIQuery,
+    spotifyRateLimit,
     handleSpotifyLogin,
     handleSpotifyLogout: logoutMutation.mutateAsync,
     isLoggingOut: logoutMutation.isPending,
