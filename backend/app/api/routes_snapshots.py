@@ -97,6 +97,11 @@ def import_account_snapshot_endpoint(
         import_followed_artists=payload.import_followed_artists,
         clear_existing_before_import=payload.clear_existing_before_import,
         strict_liked_order=payload.strict_liked_order,
+        strict_liked_order_delay_seconds=payload.strict_liked_order_delay_seconds,
+        strict_liked_order_cooldown_every=payload.strict_liked_order_cooldown_every,
+        strict_liked_order_cooldown_seconds=payload.strict_liked_order_cooldown_seconds,
+        strict_liked_order_max_consecutive_rate_limits=payload.strict_liked_order_max_consecutive_rate_limits,
+        strict_liked_order_resume_from_index=payload.strict_liked_order_resume_from_index,
     )
 
     return {
@@ -143,6 +148,11 @@ def preview_account_snapshot_import_endpoint(
         import_followed_artists=payload.import_followed_artists,
         clear_existing_before_import=payload.clear_existing_before_import,
         strict_liked_order=payload.strict_liked_order,
+        strict_liked_order_delay_seconds=payload.strict_liked_order_delay_seconds,
+        strict_liked_order_cooldown_every=payload.strict_liked_order_cooldown_every,
+        strict_liked_order_cooldown_seconds=payload.strict_liked_order_cooldown_seconds,
+        strict_liked_order_max_consecutive_rate_limits=payload.strict_liked_order_max_consecutive_rate_limits,
+        strict_liked_order_resume_from_index=payload.strict_liked_order_resume_from_index,
     )
 
     return {

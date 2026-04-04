@@ -1,4 +1,5 @@
 import unittest
+from unittest.mock import patch
 
 from spotipy.exceptions import SpotifyException
 
@@ -186,10 +187,40 @@ class AccountSnapshotTests(unittest.TestCase):
         self.assertEqual(preview["target_account"]["image_url"], "https://images.example/target-user.jpg")
         self.assertIn("Selected areas of the target account will be cleared before the snapshot is applied.", preview["warnings"])
         self.assertIn(
-            "Strict liked order will import liked songs one by one, which is slower but better for visible ordering.",
+            "Strict liked order will import liked songs one by one with a 0.75s delay between songs, a 20s cooldown every 25 songs, an automatic stop after 2 consecutive rate-limited songs so you can resume later.",
             preview["warnings"],
         )
         self.assertGreaterEqual(len(preview["destructive_operations"]), 4)
+
+    def test_preview_import_strict_resume_skips_liked_cleanup(self):
+        snapshot = {
+            "liked_tracks": [
+                {"uri": "spotify:track:liked-new-1", "added_at": "2024-01-05T00:00:00Z", "position": 0},
+                {"uri": "spotify:track:liked-new-2", "added_at": "2024-01-06T00:00:00Z", "position": 1},
+            ],
+        }
+
+        preview = preview_account_snapshot_import(
+            sp=FakeSpotify(),
+            snapshot=snapshot,
+            import_playlists=False,
+            import_saved_albums=False,
+            import_followed_artists=False,
+            clear_existing_before_import=True,
+            strict_liked_order=True,
+            strict_liked_order_resume_from_index=1,
+        )
+
+        self.assertEqual(preview["summary"]["liked_tracks_added"], 1)
+        self.assertEqual(preview["summary"]["liked_tracks_removed"], 0)
+        self.assertIn(
+            "Liked-song cleanup will be skipped because strict liked-order resume must preserve songs that were already imported.",
+            preview["warnings"],
+        )
+        self.assertIn(
+            "Strict liked-song import will resume from position 2 of 2.",
+            preview["warnings"],
+        )
 
     def test_export_snapshot_skips_forbidden_playlist_and_keeps_other_playlists(self):
         fake_spotify = ExportFakeSpotify()
@@ -235,11 +266,11 @@ class AccountSnapshotTests(unittest.TestCase):
                 return {"artists": {"items": self._followed_artists[:limit], "cursors": {"after": None}}}
 
             def _put(self, url, args=None, payload=None, **kwargs):
-                self.put_calls.append((url, payload or {}))
+                self.put_calls.append((url, args or {}))
                 return None
 
             def _delete(self, url, args=None, payload=None, **kwargs):
-                self.delete_calls.append((url, payload or {}))
+                self.delete_calls.append((url, args or {}))
                 return None
 
         snapshot = {
@@ -265,18 +296,146 @@ class AccountSnapshotTests(unittest.TestCase):
         self.assertEqual(
             fake_spotify.delete_calls,
             [
-                ("me/library", {"uris": ["spotify:track:existing-track"]}),
-                ("me/library", {"uris": ["spotify:album:existing-album"]}),
-                ("me/library", {"uris": ["spotify:artist:existing-artist"]}),
+                ("me/library", {"uris": "spotify:track:existing-track"}),
+                ("me/library", {"uris": "spotify:album:existing-album"}),
+                ("me/library", {"uris": "spotify:artist:existing-artist"}),
             ],
         )
         self.assertEqual(
             fake_spotify.put_calls,
             [
-                ("me/library", {"uris": ["spotify:track:new-track"]}),
-                ("me/library", {"uris": ["spotify:album:new-album"]}),
-                ("me/library", {"uris": ["spotify:artist:new-artist"]}),
+                ("me/library", {"uris": "spotify:track:new-track"}),
+                ("me/library", {"uris": "spotify:album:new-album"}),
+                ("me/library", {"uris": "spotify:artist:new-artist"}),
             ],
+        )
+
+    def test_import_snapshot_batches_library_writes_in_groups_of_40(self):
+        class LibraryBatchingFakeSpotify:
+            def __init__(self):
+                self._current_user = {"id": "target-user", "display_name": "Target User"}
+                self.put_calls: list[tuple[str, dict]] = []
+
+            def current_user(self):
+                return self._current_user
+
+            def _put(self, url, args=None, payload=None, **kwargs):
+                self.put_calls.append((url, args or {}))
+                return None
+
+        liked_tracks = [
+            {"uri": f"spotify:track:track-{index}", "position": index}
+            for index in range(41)
+        ]
+        fake_spotify = LibraryBatchingFakeSpotify()
+
+        result = import_account_snapshot(
+            sp=fake_spotify,
+            snapshot={"liked_tracks": liked_tracks},
+            import_playlists=False,
+            import_saved_albums=False,
+            import_followed_artists=False,
+            clear_existing_before_import=False,
+        )
+
+        self.assertEqual(result["summary"]["liked_tracks_added"], 41)
+        self.assertEqual(len(fake_spotify.put_calls), 2)
+        self.assertEqual(fake_spotify.put_calls[0][0], "me/library")
+        self.assertEqual(len(fake_spotify.put_calls[0][1]["uris"].split(",")), 40)
+        self.assertEqual(fake_spotify.put_calls[1], ("me/library", {"uris": "spotify:track:track-40"}))
+
+    def test_import_snapshot_strict_liked_order_retries_rate_limited_tracks(self):
+        class StrictOrderRetryFakeSpotify:
+            def __init__(self):
+                self._current_user = {"id": "target-user", "display_name": "Target User"}
+                self.put_attempts = 0
+
+            def current_user(self):
+                return self._current_user
+
+            def _put(self, url, args=None, payload=None, **kwargs):
+                self.put_attempts += 1
+                if self.put_attempts < 3:
+                    raise SpotifyException(
+                        429,
+                        -1,
+                        "Too Many Requests",
+                        reason="rate limited",
+                        headers={"Retry-After": "0"},
+                    )
+                return None
+
+        fake_spotify = StrictOrderRetryFakeSpotify()
+
+        with patch("backend.app.services.account_snapshot.time.sleep") as sleep_mock:
+            result = import_account_snapshot(
+                sp=fake_spotify,
+                snapshot={"liked_tracks": [{"uri": "spotify:track:new-track", "position": 0}]},
+                import_playlists=False,
+                import_saved_albums=False,
+                import_followed_artists=False,
+                clear_existing_before_import=False,
+                strict_liked_order=True,
+            )
+
+        self.assertEqual(fake_spotify.put_attempts, 3)
+        self.assertEqual(result["summary"]["liked_tracks_added"], 1)
+        self.assertEqual(result["summary"]["liked_tracks_failed"], 0)
+        self.assertIsNone(result["next_resume_index"])
+        self.assertIn(
+            "Strict liked order will import liked songs one by one with a 0.75s delay between songs, a 20s cooldown every 25 songs, an automatic stop after 2 consecutive rate-limited songs so you can resume later.",
+            result["warnings"],
+        )
+        self.assertEqual(sleep_mock.call_count, 2)
+
+    def test_import_snapshot_strict_liked_order_stops_after_repeated_rate_limits(self):
+        class StrictOrderAlwaysRateLimitedSpotify:
+            def __init__(self):
+                self._current_user = {"id": "target-user", "display_name": "Target User"}
+                self.put_attempts = 0
+
+            def current_user(self):
+                return self._current_user
+
+            def _put(self, url, args=None, payload=None, **kwargs):
+                self.put_attempts += 1
+                raise SpotifyException(
+                    429,
+                    -1,
+                    "Too Many Requests",
+                    reason="rate limited",
+                    headers={"Retry-After": "0"},
+                )
+
+        fake_spotify = StrictOrderAlwaysRateLimitedSpotify()
+
+        with patch("backend.app.services.account_snapshot.time.sleep"):
+            result = import_account_snapshot(
+                sp=fake_spotify,
+                snapshot={
+                    "liked_tracks": [
+                        {"uri": "spotify:track:first", "position": 0},
+                        {"uri": "spotify:track:second", "position": 1},
+                        {"uri": "spotify:track:third", "position": 2},
+                    ]
+                },
+                import_playlists=False,
+                import_saved_albums=False,
+                import_followed_artists=False,
+                clear_existing_before_import=False,
+                strict_liked_order=True,
+                strict_liked_order_max_consecutive_rate_limits=2,
+            )
+
+        self.assertEqual(result["summary"]["liked_tracks_added"], 0)
+        self.assertEqual(result["summary"]["liked_tracks_failed"], 2)
+        self.assertTrue(result["strict_liked_order"]["stopped_early"])
+        self.assertFalse(result["strict_liked_order"]["completed"])
+        self.assertEqual(result["next_resume_index"], 1)
+        self.assertEqual(result["strict_liked_order"]["next_resume_index"], 1)
+        self.assertIn(
+            "Paused strict liked-song import after repeated Spotify rate limits. Resume from position 2.",
+            result["warnings"],
         )
 
 

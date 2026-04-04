@@ -172,6 +172,11 @@ export type ImportSnapshotPayload = {
   import_followed_artists: boolean
   clear_existing_before_import: boolean
   strict_liked_order: boolean
+  strict_liked_order_delay_seconds?: number
+  strict_liked_order_cooldown_every?: number
+  strict_liked_order_cooldown_seconds?: number
+  strict_liked_order_max_consecutive_rate_limits?: number
+  strict_liked_order_resume_from_index?: number
 }
 
 export type SnapshotImportRequestedActions = {
@@ -181,6 +186,11 @@ export type SnapshotImportRequestedActions = {
   import_followed_artists: boolean
   clear_existing_before_import: boolean
   strict_liked_order: boolean
+  strict_liked_order_delay_seconds?: number | null
+  strict_liked_order_cooldown_every?: number | null
+  strict_liked_order_cooldown_seconds?: number | null
+  strict_liked_order_max_consecutive_rate_limits?: number | null
+  strict_liked_order_resume_from_index?: number | null
 }
 
 export type ImportSnapshotSummary = {
@@ -214,6 +224,22 @@ export type ImportSnapshotResult = {
   summary: ImportSnapshotSummary
   created_playlists: ImportedPlaylistSummary[]
   warnings: string[]
+  next_resume_index?: number | null
+  strict_liked_order?: {
+    enabled: boolean
+    delay_seconds: number
+    cooldown_every: number | null
+    cooldown_seconds: number
+    max_consecutive_rate_limits: number | null
+    resume_from_index: number
+    requested_total: number
+    remaining_total: number
+    processed_count: number
+    completed: boolean
+    stopped_early: boolean
+    stopped_reason: string | null
+    next_resume_index: number | null
+  }
 }
 
 export type ImportSnapshotResponse = {

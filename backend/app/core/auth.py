@@ -101,6 +101,7 @@ def get_spotify_client_for_session(
         requests_timeout=SPOTIFY_REQUEST_TIMEOUT_SECONDS,
         retries=0,
         status_retries=0,
+        status_forcelist=(),
     )
 
 

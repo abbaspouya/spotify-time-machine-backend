@@ -148,6 +148,20 @@ function formatFileSize(size: number) {
   return `${(size / (1024 * 1024)).toFixed(1)} MB`
 }
 
+function parseResumePosition(value: string) {
+  const trimmed = value.trim()
+  if (!trimmed) {
+    return 0
+  }
+
+  const parsed = Number.parseInt(trimmed, 10)
+  if (!Number.isFinite(parsed) || parsed <= 1) {
+    return 0
+  }
+
+  return parsed - 1
+}
+
 async function readSnapshotDocument(file: File): Promise<SnapshotDocument> {
   const raw = await file.text()
 
@@ -404,6 +418,7 @@ export function TransferLibraryTool() {
     importFollowedArtists: true,
     clearExistingBeforeImport: false,
     strictLikedOrder: false,
+    strictLikedOrderResumePosition: "",
   })
 
   const startExportJobMutation = useMutation({
@@ -485,6 +500,7 @@ export function TransferLibraryTool() {
         import_followed_artists: importForm.importFollowedArtists,
         clear_existing_before_import: importForm.clearExistingBeforeImport,
         strict_liked_order: importForm.strictLikedOrder,
+        strict_liked_order_resume_from_index: parseResumePosition(importForm.strictLikedOrderResumePosition),
       }, "target")
 
       return { response, snapshot }
@@ -513,6 +529,7 @@ export function TransferLibraryTool() {
         import_followed_artists: importForm.importFollowedArtists,
         clear_existing_before_import: importForm.clearExistingBeforeImport,
         strict_liked_order: importForm.strictLikedOrder,
+        strict_liked_order_resume_from_index: parseResumePosition(importForm.strictLikedOrderResumePosition),
       }, "target")
     },
     onSuccess: (job) => {
@@ -659,9 +676,26 @@ export function TransferLibraryTool() {
   }
 
   const previewRequiresConfirmation = Boolean(previewData?.requires_confirmation)
+  const suggestedResumePosition =
+    importResult?.result.next_resume_index != null ? importResult.result.next_resume_index + 1 : null
   const canStartImport =
     Boolean(previewData) && isTargetAuthenticated && (!previewRequiresConfirmation || importConfirmationChecked) && !isImporting
   const snapshotReady = Boolean(snapshotFile || exportResult)
+
+  const applySuggestedResumePoint = () => {
+    if (!suggestedResumePosition) {
+      return
+    }
+
+    setImportForm((current) => ({
+      ...current,
+      importLikedTracks: true,
+      clearExistingBeforeImport: false,
+      strictLikedOrder: true,
+      strictLikedOrderResumePosition: String(suggestedResumePosition),
+    }))
+    resetImportWorkflow()
+  }
 
   const transferFlowSteps = [
     {
@@ -919,6 +953,30 @@ export function TransferLibraryTool() {
             ))}
           </div>
 
+          {importForm.strictLikedOrder && importForm.importLikedTracks ? (
+            <div className="rounded-2xl border border-border bg-white/75 p-4">
+              <Label htmlFor="strictLikedOrderResumePosition">Resume strict liked-song import from position</Label>
+              <Input
+                id="strictLikedOrderResumePosition"
+                className="mt-2"
+                inputMode="numeric"
+                min="1"
+                placeholder="Leave blank to start from the beginning"
+                value={importForm.strictLikedOrderResumePosition}
+                onChange={(event) => {
+                  setImportForm((current) => ({
+                    ...current,
+                    strictLikedOrderResumePosition: event.target.value.replace(/[^\d]/g, ""),
+                  }))
+                  resetImportWorkflow()
+                }}
+              />
+              <p className="mt-2 text-sm text-muted-foreground">
+                Use the 1-based song position shown after a partial strict-order run. Leave this empty for a full strict-order import.
+              </p>
+            </div>
+          ) : null}
+
           <div className="flex flex-wrap gap-3">
             <Button
               className="w-full sm:w-auto"
@@ -1073,6 +1131,23 @@ export function TransferLibraryTool() {
               <div className="space-y-3">
                 <div className="text-sm font-semibold text-foreground">Items that could not be applied</div>
                 <SummaryGrid items={importFailureItems} />
+              </div>
+            ) : null}
+
+            {suggestedResumePosition ? (
+              <div className="space-y-3 rounded-2xl border border-primary/20 bg-white/75 p-4">
+                <div>
+                  <p className="text-sm font-semibold text-foreground">Resume strict liked-song import</p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Continue from position {suggestedResumePosition} without clearing the songs that already made it over.
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-3">
+                  <Button onClick={applySuggestedResumePoint} type="button" variant="secondary">
+                    <ArrowRight className="h-4 w-4" />
+                    Use resume point {suggestedResumePosition}
+                  </Button>
+                </div>
               </div>
             ) : null}
 

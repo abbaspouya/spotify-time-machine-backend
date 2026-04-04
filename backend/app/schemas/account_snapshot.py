@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class ExportAccountSnapshotRequest(BaseModel):
@@ -21,3 +21,8 @@ class ImportAccountSnapshotRequest(BaseModel):
     import_followed_artists: bool = True
     clear_existing_before_import: bool = False
     strict_liked_order: bool = False
+    strict_liked_order_delay_seconds: float | None = Field(default=None, ge=0.0)
+    strict_liked_order_cooldown_every: int | None = Field(default=None, ge=0)
+    strict_liked_order_cooldown_seconds: float | None = Field(default=None, ge=0.0)
+    strict_liked_order_max_consecutive_rate_limits: int | None = Field(default=None, ge=0)
+    strict_liked_order_resume_from_index: int = Field(default=0, ge=0)

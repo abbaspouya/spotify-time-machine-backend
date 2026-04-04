@@ -2,10 +2,12 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from datetime import datetime, timezone
+from email.utils import parsedate_to_datetime
 from pathlib import Path
 from typing import Any
 import json
 import re
+import time
 
 import spotipy
 from spotipy.exceptions import SpotifyException
@@ -24,6 +26,14 @@ PROJECT_ROOT = BACKEND_DIR.parent
 EXPORT_DIR = BACKEND_DIR / "exports"
 ProgressCallback = Callable[[int | None, str], None]
 logger = get_logger("snapshots")
+LIBRARY_ITEMS_BATCH_SIZE = 40
+STRICT_LIKED_ORDER_REQUEST_DELAY_SECONDS = 0.75
+STRICT_LIKED_ORDER_COOLDOWN_EVERY = 25
+STRICT_LIKED_ORDER_COOLDOWN_SECONDS = 20.0
+STRICT_LIKED_ORDER_MAX_CONSECUTIVE_RATE_LIMITS = 2
+STRICT_LIKED_ORDER_MAX_ATTEMPTS = 6
+STRICT_LIKED_ORDER_BASE_BACKOFF_SECONDS = 2.0
+STRICT_LIKED_ORDER_RETRY_BUFFER_SECONDS = 1.0
 
 
 def _parse_iso_datetime(value: str) -> datetime:
@@ -132,16 +142,141 @@ def _report_progress(callback: ProgressCallback | None, progress: int | None, me
     callback(progress, message)
 
 
+def _resolve_strict_liked_order_controls(
+    delay_seconds: float | None = None,
+    cooldown_every: int | None = None,
+    cooldown_seconds: float | None = None,
+    max_consecutive_rate_limits: int | None = None,
+    resume_from_index: int = 0,
+) -> dict[str, Any]:
+    resolved_delay_seconds = STRICT_LIKED_ORDER_REQUEST_DELAY_SECONDS if delay_seconds is None else max(0.0, float(delay_seconds))
+
+    if cooldown_every is None:
+        resolved_cooldown_every: int | None = STRICT_LIKED_ORDER_COOLDOWN_EVERY
+    else:
+        resolved_cooldown_every = int(cooldown_every)
+        if resolved_cooldown_every <= 0:
+            resolved_cooldown_every = None
+
+    if cooldown_seconds is None:
+        resolved_cooldown_seconds = STRICT_LIKED_ORDER_COOLDOWN_SECONDS
+    else:
+        resolved_cooldown_seconds = max(0.0, float(cooldown_seconds))
+
+    if resolved_cooldown_every is None or resolved_cooldown_seconds <= 0:
+        resolved_cooldown_every = None
+        resolved_cooldown_seconds = 0.0
+
+    if max_consecutive_rate_limits is None:
+        resolved_max_consecutive_rate_limits: int | None = STRICT_LIKED_ORDER_MAX_CONSECUTIVE_RATE_LIMITS
+    else:
+        resolved_max_consecutive_rate_limits = int(max_consecutive_rate_limits)
+        if resolved_max_consecutive_rate_limits <= 0:
+            resolved_max_consecutive_rate_limits = None
+
+    return {
+        "delay_seconds": resolved_delay_seconds,
+        "cooldown_every": resolved_cooldown_every,
+        "cooldown_seconds": resolved_cooldown_seconds,
+        "max_consecutive_rate_limits": resolved_max_consecutive_rate_limits,
+        "resume_from_index": max(0, int(resume_from_index)),
+    }
+
+
+def _build_strict_liked_order_warning(controls: dict[str, Any]) -> str:
+    details = [f"a {controls['delay_seconds']:.2f}s delay between songs"]
+
+    cooldown_every = controls.get("cooldown_every")
+    cooldown_seconds = controls.get("cooldown_seconds", 0.0)
+    if isinstance(cooldown_every, int) and cooldown_every > 0 and cooldown_seconds > 0:
+        details.append(f"a {cooldown_seconds:.0f}s cooldown every {cooldown_every} songs")
+
+    max_consecutive_rate_limits = controls.get("max_consecutive_rate_limits")
+    if isinstance(max_consecutive_rate_limits, int) and max_consecutive_rate_limits > 0:
+        details.append(f"an automatic stop after {max_consecutive_rate_limits} consecutive rate-limited songs so you can resume later")
+
+    return "Strict liked order will import liked songs one by one with " + ", ".join(details) + "."
+
+
+def _parse_retry_after_seconds(value: Any) -> float | None:
+    if value is None:
+        return None
+
+    if isinstance(value, (int, float)):
+        return max(0.0, float(value))
+
+    if not isinstance(value, str):
+        return None
+
+    raw = value.strip()
+    if not raw:
+        return None
+
+    try:
+        return max(0.0, float(raw))
+    except ValueError:
+        pass
+
+    try:
+        retry_at = parsedate_to_datetime(raw)
+    except (TypeError, ValueError, IndexError, OverflowError):
+        return None
+
+    if retry_at.tzinfo is None:
+        retry_at = retry_at.replace(tzinfo=timezone.utc)
+
+    return max(0.0, (retry_at.astimezone(timezone.utc) - datetime.now(timezone.utc)).total_seconds())
+
+
+def _strict_liked_order_retry_delay(exc: SpotifyException, attempt: int) -> float:
+    headers = getattr(exc, "headers", None)
+    retry_after: float | None = None
+    if isinstance(headers, dict):
+        retry_after = _parse_retry_after_seconds(headers.get("Retry-After") or headers.get("retry-after"))
+
+    if retry_after is not None:
+        return retry_after + STRICT_LIKED_ORDER_RETRY_BUFFER_SECONDS
+
+    return STRICT_LIKED_ORDER_BASE_BACKOFF_SECONDS * (2 ** max(0, attempt - 1))
+
+
+def _save_items_to_library_with_retries(sp: spotipy.Spotify, uris: list[str]) -> None:
+    if not uris:
+        return
+
+    attempt = 1
+    while True:
+        try:
+            _save_items_to_library(sp, uris)
+            return
+        except SpotifyException as exc:
+            status_code = getattr(exc, "http_status", None)
+            if status_code not in {429, 500, 502, 503, 504} or attempt >= STRICT_LIKED_ORDER_MAX_ATTEMPTS:
+                raise
+
+            delay_seconds = _strict_liked_order_retry_delay(exc, attempt)
+            logger.warning(
+                f"strict_liked_order_retry_scheduled attempt={attempt} delay_seconds={delay_seconds:.2f}",
+                extra={
+                    "spotify_error_code": getattr(exc, "code", None),
+                    "spotify_error_reason": getattr(exc, "reason", None),
+                    "spotify_error_message": getattr(exc, "msg", str(exc)),
+                },
+            )
+            time.sleep(delay_seconds)
+            attempt += 1
+
+
 def _save_items_to_library(sp: spotipy.Spotify, uris: list[str]) -> None:
     if not uris:
         return
-    sp._put("me/library", payload={"uris": uris})
+    sp._put("me/library", args={"uris": ",".join(uris)})
 
 
 def _remove_items_from_library(sp: spotipy.Spotify, uris: list[str]) -> None:
     if not uris:
         return
-    sp._delete("me/library", payload={"uris": uris})
+    sp._delete("me/library", args={"uris": ",".join(uris)})
 
 
 def _build_account_identity(user: Any) -> dict[str, Any] | None:
@@ -670,6 +805,11 @@ def import_account_snapshot(
     import_followed_artists: bool = True,
     clear_existing_before_import: bool = False,
     strict_liked_order: bool = False,
+    strict_liked_order_delay_seconds: float | None = None,
+    strict_liked_order_cooldown_every: int | None = None,
+    strict_liked_order_cooldown_seconds: float | None = None,
+    strict_liked_order_max_consecutive_rate_limits: int | None = None,
+    strict_liked_order_resume_from_index: int = 0,
     progress_callback: ProgressCallback | None = None,
 ) -> dict[str, Any]:
     _report_progress(progress_callback, 5, "Preparing snapshot import")
@@ -677,6 +817,18 @@ def import_account_snapshot(
     target_account = _build_account_identity(me)
     user_id = target_account.get("id") if isinstance(target_account, dict) else None
     source_account = _extract_snapshot_source_account(snapshot)
+    strict_liked_order_controls = _resolve_strict_liked_order_controls(
+        delay_seconds=strict_liked_order_delay_seconds,
+        cooldown_every=strict_liked_order_cooldown_every,
+        cooldown_seconds=strict_liked_order_cooldown_seconds,
+        max_consecutive_rate_limits=strict_liked_order_max_consecutive_rate_limits,
+        resume_from_index=strict_liked_order_resume_from_index,
+    )
+    resume_liked_tracks_import = (
+        import_liked_tracks
+        and strict_liked_order
+        and strict_liked_order_controls["resume_from_index"] > 0
+    )
 
     result: dict[str, Any] = {
         "imported_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
@@ -687,7 +839,28 @@ def import_account_snapshot(
         "summary": _build_empty_import_summary(),
         "created_playlists": [],
         "warnings": [],
+        "strict_liked_order": {
+            "enabled": strict_liked_order,
+            "delay_seconds": strict_liked_order_controls["delay_seconds"],
+            "cooldown_every": strict_liked_order_controls["cooldown_every"],
+            "cooldown_seconds": strict_liked_order_controls["cooldown_seconds"],
+            "max_consecutive_rate_limits": strict_liked_order_controls["max_consecutive_rate_limits"],
+            "resume_from_index": strict_liked_order_controls["resume_from_index"],
+            "requested_total": 0,
+            "remaining_total": 0,
+            "processed_count": 0,
+            "completed": not strict_liked_order,
+            "stopped_early": False,
+            "stopped_reason": None,
+            "next_resume_index": None,
+        },
+        "next_resume_index": None,
     }
+
+    if import_liked_tracks and strict_liked_order_controls["resume_from_index"] > 0 and not strict_liked_order:
+        result["warnings"].append(
+            "strict_liked_order_resume_from_index was ignored because strict_liked_order is disabled."
+        )
 
     if clear_existing_before_import:
         _report_progress(progress_callback, 15, "Clearing selected content before import")
@@ -708,26 +881,31 @@ def import_account_snapshot(
                 )
 
         if import_liked_tracks:
-            existing_track_ids = _collect_saved_track_ids(sp)
-            existing_track_uris = [_id_to_uri("track", track_id) for track_id in existing_track_ids]
-            for track_chunk in _chunk(existing_track_uris, 50):
-                try:
-                    _remove_items_from_library(sp, track_chunk)
-                    result["summary"]["liked_tracks_removed"] += len(track_chunk)
-                except Exception:
-                    for track_uri in track_chunk:
-                        try:
-                            _remove_items_from_library(sp, [track_uri])
-                            result["summary"]["liked_tracks_removed"] += 1
-                        except Exception:
-                            result["warnings"].append(
-                                f"Failed to remove liked track before import: {_uri_to_id(track_uri)}"
-                            )
+            if resume_liked_tracks_import:
+                result["warnings"].append(
+                    "Skipped clearing currently liked songs because strict liked-order resume needs already imported songs to remain in place."
+                )
+            else:
+                existing_track_ids = _collect_saved_track_ids(sp)
+                existing_track_uris = [_id_to_uri("track", track_id) for track_id in existing_track_ids]
+                for track_chunk in _chunk(existing_track_uris, LIBRARY_ITEMS_BATCH_SIZE):
+                    try:
+                        _remove_items_from_library(sp, track_chunk)
+                        result["summary"]["liked_tracks_removed"] += len(track_chunk)
+                    except Exception:
+                        for track_uri in track_chunk:
+                            try:
+                                _remove_items_from_library(sp, [track_uri])
+                                result["summary"]["liked_tracks_removed"] += 1
+                            except Exception:
+                                result["warnings"].append(
+                                    f"Failed to remove liked track before import: {_uri_to_id(track_uri)}"
+                                )
 
         if import_saved_albums:
             existing_album_ids = _collect_saved_album_ids(sp)
             existing_album_uris = [_id_to_uri("album", album_id) for album_id in existing_album_ids]
-            for album_chunk in _chunk(existing_album_uris, 50):
+            for album_chunk in _chunk(existing_album_uris, LIBRARY_ITEMS_BATCH_SIZE):
                 try:
                     _remove_items_from_library(sp, album_chunk)
                     result["summary"]["saved_albums_removed"] += len(album_chunk)
@@ -744,7 +922,7 @@ def import_account_snapshot(
         if import_followed_artists:
             existing_artist_ids = _collect_followed_artist_ids(sp)
             existing_artist_uris = [_id_to_uri("artist", artist_id) for artist_id in existing_artist_ids]
-            for artist_chunk in _chunk(existing_artist_uris, 50):
+            for artist_chunk in _chunk(existing_artist_uris, LIBRARY_ITEMS_BATCH_SIZE):
                 try:
                     _remove_items_from_library(sp, artist_chunk)
                     result["summary"]["followed_artists_removed"] += len(artist_chunk)
@@ -837,17 +1015,101 @@ def import_account_snapshot(
                 liked_track_uris = list(reversed(liked_track_uris))
 
             if strict_liked_order:
-                result["warnings"].append(
-                    "strict_liked_order is enabled: importing liked songs one-by-one for better ordering; this is slower."
-                )
-                for track_uri in liked_track_uris:
+                total_liked_tracks = len(liked_track_uris)
+                resume_from_index = min(strict_liked_order_controls["resume_from_index"], total_liked_tracks)
+                result["strict_liked_order"]["requested_total"] = total_liked_tracks
+                result["strict_liked_order"]["remaining_total"] = max(0, total_liked_tracks - resume_from_index)
+                result["strict_liked_order"]["resume_from_index"] = resume_from_index
+                result["warnings"].append(_build_strict_liked_order_warning(strict_liked_order_controls))
+                if strict_liked_order_controls["resume_from_index"] > total_liked_tracks and total_liked_tracks > 0:
+                    result["warnings"].append(
+                        f"Strict liked-order resume index {strict_liked_order_controls['resume_from_index']} exceeded the available liked songs; nothing remained to restore."
+                    )
+                elif resume_from_index > 0 and total_liked_tracks > 0:
+                    result["warnings"].append(
+                        f"Resuming strict liked-song import from position {resume_from_index + 1} of {total_liked_tracks}."
+                    )
+
+                consecutive_rate_limit_failures = 0
+                remaining_track_uris = liked_track_uris[resume_from_index:]
+                for offset, track_uri in enumerate(remaining_track_uris):
+                    absolute_index = resume_from_index + offset
+                    has_more_tracks = absolute_index + 1 < total_liked_tracks
                     try:
-                        _save_items_to_library(sp, [track_uri])
+                        _save_items_to_library_with_retries(sp, [track_uri])
                         result["summary"]["liked_tracks_added"] += 1
+                        consecutive_rate_limit_failures = 0
+                    except SpotifyException as exc:
+                        result["summary"]["liked_tracks_failed"] += 1
+                        if getattr(exc, "http_status", None) == 429:
+                            consecutive_rate_limit_failures += 1
+                            max_consecutive_rate_limits = strict_liked_order_controls["max_consecutive_rate_limits"]
+                            if (
+                                isinstance(max_consecutive_rate_limits, int)
+                                and max_consecutive_rate_limits > 0
+                                and consecutive_rate_limit_failures >= max_consecutive_rate_limits
+                            ):
+                                result["strict_liked_order"]["processed_count"] = offset + 1
+                                result["strict_liked_order"]["completed"] = False
+                                result["strict_liked_order"]["stopped_early"] = True
+                                result["strict_liked_order"]["stopped_reason"] = "rate_limited"
+                                result["strict_liked_order"]["next_resume_index"] = absolute_index
+                                result["next_resume_index"] = absolute_index
+                                result["warnings"].append(
+                                    f"Paused strict liked-song import after repeated Spotify rate limits. Resume from position {absolute_index + 1}."
+                                )
+                                break
+                        else:
+                            consecutive_rate_limit_failures = 0
                     except Exception:
                         result["summary"]["liked_tracks_failed"] += 1
+                        consecutive_rate_limit_failures = 0
+
+                    result["strict_liked_order"]["processed_count"] = offset + 1
+                    result["strict_liked_order"]["next_resume_index"] = absolute_index + 1 if has_more_tracks else None
+                    result["next_resume_index"] = absolute_index + 1 if has_more_tracks else None
+                    liked_progress = 65 + int(((absolute_index + 1) / total_liked_tracks) * 16) if total_liked_tracks else 65
+
+                    if total_liked_tracks and (
+                        absolute_index + 1 == resume_from_index + 1
+                        or absolute_index + 1 == total_liked_tracks
+                        or (absolute_index + 1 - resume_from_index) % 10 == 0
+                    ):
+                        _report_progress(
+                            progress_callback,
+                            liked_progress,
+                            f"Restoring liked songs in strict order ({absolute_index + 1}/{total_liked_tracks})",
+                        )
+
+                    cooldown_every = strict_liked_order_controls["cooldown_every"]
+                    cooldown_seconds = strict_liked_order_controls["cooldown_seconds"]
+                    if (
+                        has_more_tracks
+                        and isinstance(cooldown_every, int)
+                        and cooldown_every > 0
+                        and cooldown_seconds > 0
+                        and (offset + 1) % cooldown_every == 0
+                    ):
+                        _report_progress(
+                            progress_callback,
+                            liked_progress if total_liked_tracks else 65,
+                            f"Cooling down strict liked-song import after {absolute_index + 1} songs",
+                        )
+                        time.sleep(cooldown_seconds)
+
+                    if has_more_tracks:
+                        time.sleep(strict_liked_order_controls["delay_seconds"])
+
+                if not result["strict_liked_order"]["stopped_early"]:
+                    result["strict_liked_order"]["completed"] = True
+                    result["strict_liked_order"]["next_resume_index"] = None
+                    result["next_resume_index"] = None
+                if result["summary"]["liked_tracks_failed"] > 0:
+                    result["warnings"].append(
+                        "Some liked songs could not be restored in strict order. Spotify rate limits or unavailable tracks may require retrying later."
+                    )
             else:
-                for chunk_uris in _chunk(liked_track_uris, 50):
+                for chunk_uris in _chunk(liked_track_uris, LIBRARY_ITEMS_BATCH_SIZE):
                     try:
                         _save_items_to_library(sp, chunk_uris)
                         result["summary"]["liked_tracks_added"] += len(chunk_uris)
@@ -870,7 +1132,7 @@ def import_account_snapshot(
                 # Saved albums are typically displayed newest-first as well.
                 normalized_album_uris = list(reversed(normalized_album_uris))
 
-            for chunk_uris in _chunk(normalized_album_uris, 50):
+            for chunk_uris in _chunk(normalized_album_uris, LIBRARY_ITEMS_BATCH_SIZE):
                 try:
                     _save_items_to_library(sp, chunk_uris)
                     result["summary"]["saved_albums_added"] += len(chunk_uris)
@@ -900,7 +1162,7 @@ def import_account_snapshot(
 
             artist_uris = _dedupe_preserve_order(artist_uris)
 
-            for chunk_uris in _chunk(artist_uris, 50):
+            for chunk_uris in _chunk(artist_uris, LIBRARY_ITEMS_BATCH_SIZE):
                 try:
                     _save_items_to_library(sp, chunk_uris)
                     result["summary"]["followed_artists_added"] += len(chunk_uris)
@@ -925,12 +1187,29 @@ def preview_account_snapshot_import(
     import_followed_artists: bool = True,
     clear_existing_before_import: bool = False,
     strict_liked_order: bool = False,
+    strict_liked_order_delay_seconds: float | None = None,
+    strict_liked_order_cooldown_every: int | None = None,
+    strict_liked_order_cooldown_seconds: float | None = None,
+    strict_liked_order_max_consecutive_rate_limits: int | None = None,
+    strict_liked_order_resume_from_index: int = 0,
 ) -> dict[str, Any]:
     me = sp.current_user()
     target_account = _build_account_identity(me)
     user_id = target_account.get("id") if isinstance(target_account, dict) else None
     source_account = _extract_snapshot_source_account(snapshot)
     source_user_id = source_account.get("id") if isinstance(source_account, dict) else snapshot.get("source_user_id")
+    strict_liked_order_controls = _resolve_strict_liked_order_controls(
+        delay_seconds=strict_liked_order_delay_seconds,
+        cooldown_every=strict_liked_order_cooldown_every,
+        cooldown_seconds=strict_liked_order_cooldown_seconds,
+        max_consecutive_rate_limits=strict_liked_order_max_consecutive_rate_limits,
+        resume_from_index=strict_liked_order_resume_from_index,
+    )
+    resume_liked_tracks_import = (
+        import_liked_tracks
+        and strict_liked_order
+        and strict_liked_order_controls["resume_from_index"] > 0
+    )
 
     warnings: list[str] = []
     destructive_operations: list[str] = []
@@ -966,10 +1245,23 @@ def preview_account_snapshot_import(
             ordered_liked_entries = _order_entries_by_position(liked_entries)
             liked_uris = _normalize_uri_entries(ordered_liked_entries)
             liked_ids = _dedupe_preserve_order([_uri_to_id(uri) for uri in liked_uris if uri])
-            summary["liked_tracks_added"] = len(liked_ids)
+            resume_from_index = min(strict_liked_order_controls["resume_from_index"], len(liked_ids))
+            summary["liked_tracks_added"] = len(liked_ids) - resume_from_index if strict_liked_order else len(liked_ids)
             if strict_liked_order and liked_ids:
                 warnings.append(
-                    "Strict liked order will import liked songs one by one, which is slower but better for visible ordering."
+                    _build_strict_liked_order_warning(strict_liked_order_controls)
+                )
+                if strict_liked_order_controls["resume_from_index"] > len(liked_ids):
+                    warnings.append(
+                        f"Strict liked-order resume index {strict_liked_order_controls['resume_from_index']} exceeds the available liked songs; no liked songs remain to restore."
+                    )
+                elif resume_from_index > 0:
+                    warnings.append(
+                        f"Strict liked-song import will resume from position {resume_from_index + 1} of {len(liked_ids)}."
+                    )
+            elif strict_liked_order_controls["resume_from_index"] > 0:
+                warnings.append(
+                    "strict_liked_order_resume_from_index will be ignored because strict_liked_order is disabled."
                 )
 
     if import_saved_albums:
@@ -1008,10 +1300,15 @@ def preview_account_snapshot_import(
             )
 
         if import_liked_tracks:
-            summary["liked_tracks_removed"] = len(_collect_saved_track_ids(sp))
-            destructive_operations.append(
-                f"Remove {summary['liked_tracks_removed']} currently liked songs before restoring the snapshot."
-            )
+            if resume_liked_tracks_import:
+                warnings.append(
+                    "Liked-song cleanup will be skipped because strict liked-order resume must preserve songs that were already imported."
+                )
+            else:
+                summary["liked_tracks_removed"] = len(_collect_saved_track_ids(sp))
+                destructive_operations.append(
+                    f"Remove {summary['liked_tracks_removed']} currently liked songs before restoring the snapshot."
+                )
 
         if import_saved_albums:
             summary["saved_albums_removed"] = len(_collect_saved_album_ids(sp))
@@ -1040,6 +1337,11 @@ def preview_account_snapshot_import(
             "import_followed_artists": import_followed_artists,
             "clear_existing_before_import": clear_existing_before_import,
             "strict_liked_order": strict_liked_order,
+            "strict_liked_order_delay_seconds": strict_liked_order_controls["delay_seconds"],
+            "strict_liked_order_cooldown_every": strict_liked_order_controls["cooldown_every"],
+            "strict_liked_order_cooldown_seconds": strict_liked_order_controls["cooldown_seconds"],
+            "strict_liked_order_max_consecutive_rate_limits": strict_liked_order_controls["max_consecutive_rate_limits"],
+            "strict_liked_order_resume_from_index": strict_liked_order_controls["resume_from_index"],
         },
         "destructive_operations": destructive_operations,
         "warnings": warnings,

@@ -15,6 +15,7 @@ os.environ.setdefault("SPOTIFY_REDIRECT_URI", "http://127.0.0.1:8000/callback")
 os.environ.setdefault("FRONTEND_URL", "http://127.0.0.1:5173")
 
 from backend.app.main import app
+from backend.app.core.auth import get_spotify_client_for_session
 from backend.app.core.config import SESSION_COOKIE_NAME, SPOTIFY_SCOPE
 from backend.app.core.session_store import save_token_info
 
@@ -98,6 +99,18 @@ class ApiContractTests(unittest.TestCase):
             response.json()["detail"],
             "Spotify is rate-limiting requests right now. Try again in about 17 seconds.",
         )
+
+    def test_spotify_client_disables_status_forcelist_retries(self):
+        with patch(
+            "backend.app.core.auth.get_token_info_for_session",
+            return_value={"access_token": "test-access-token"},
+        ), patch("backend.app.core.auth.spotipy.Spotify") as spotify_class:
+            get_spotify_client_for_session("test-session", "source")
+
+        kwargs = spotify_class.call_args.kwargs
+        self.assertEqual(kwargs["retries"], 0)
+        self.assertEqual(kwargs["status_retries"], 0)
+        self.assertEqual(kwargs["status_forcelist"], ())
 
     def test_logout_clears_session_cookie(self):
         with TestClient(app) as client:
