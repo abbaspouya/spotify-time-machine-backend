@@ -3,12 +3,15 @@ from fastapi import APIRouter, HTTPException, Query, Request
 from ..core.auth import DEFAULT_ACCOUNT_ROLE, get_spotify_client, normalize_account_role
 from ..core.observability import get_logger
 from ..schemas.playlist import (
+    AppendPlaylistRequest,
+    AppendPlaylistResponse,
     CreateLanguagePlaylistRequest,
     CreatePlaylistRequest,
     CurrentUserPlaylistsResponse,
     PlaylistTracksResponse,
 )
 from ..services.spotify_playlists import (
+    append_playlist_to_target,
     create_current_user_playlist,
     get_playlist_tracks,
     list_current_user_playlists,
@@ -85,6 +88,56 @@ def get_tracks_for_playlist(
             "account_role": normalized_role,
             "playlist_id": playlist_id,
             "track_count": result["total_tracks"],
+        },
+    )
+    return result
+
+
+@router.post(
+    "/playlists/append",
+    response_model=AppendPlaylistResponse,
+    summary="Add one playlist into liked songs or another playlist",
+)
+def append_playlist(
+    payload: AppendPlaylistRequest,
+    request: Request,
+    account_role: str = Query(DEFAULT_ACCOUNT_ROLE, description="Spotify account slot: source or target."),
+):
+    normalized_role = normalize_account_role(account_role)
+    logger.info(
+        "spotify_playlist_append_started",
+        extra={
+            "method": request.method,
+            "path": request.url.path,
+            "account_role": normalized_role,
+            "source_playlist_id": payload.source_playlist_id,
+            "target_type": payload.target_type,
+            "target_playlist_id": payload.target_playlist_id,
+        },
+    )
+    sp = get_spotify_client(request, normalized_role)
+
+    try:
+        result = append_playlist_to_target(
+            sp,
+            source_playlist_id=payload.source_playlist_id,
+            target_type=payload.target_type,
+            target_playlist_id=payload.target_playlist_id,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    logger.info(
+        "spotify_playlist_append_completed",
+        extra={
+            "method": request.method,
+            "path": request.url.path,
+            "account_role": normalized_role,
+            "source_playlist_id": payload.source_playlist_id,
+            "target_type": payload.target_type,
+            "target_playlist_id": payload.target_playlist_id,
+            "tracks_added": result["tracks_added"],
+            "skipped_tracks": result["skipped_tracks"],
         },
     )
     return result

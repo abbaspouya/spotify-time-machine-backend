@@ -70,16 +70,24 @@ class FakeSpotifyPlaylists:
         self.current_user_playlists_calls: list[tuple[int, int]] = []
         self.playlist_calls: list[tuple[str, str | None]] = []
         self.playlist_items_calls: list[tuple[str, dict]] = []
+        self.post_calls: list[tuple[str, dict | None]] = []
+        self.put_calls: list[tuple[str, dict | None]] = []
+        self.playlists_by_id = {
+            "playlist-1": _playlist("playlist-1", "Road Trip", 2, image_url="https://img/playlist-1.jpg"),
+            "playlist-2": _playlist("playlist-2", "Focus", 1),
+            "playlist-transfer-source": _playlist("playlist-transfer-source", "Phone Draft", 3, image_url="https://img/source.jpg"),
+            "playlist-transfer-target": _playlist("playlist-transfer-target", "Archive", 5, image_url="https://img/target.jpg"),
+        }
 
     def current_user_playlists(self, limit: int = 50, offset: int = 0):
         self.current_user_playlists_calls.append((limit, offset))
         pages = {
             0: {
-                "items": [_playlist("playlist-1", "Road Trip", 2, image_url="https://img/playlist-1.jpg")],
+                "items": [self.playlists_by_id["playlist-1"]],
                 "total": 2,
             },
             1: {
-                "items": [_playlist("playlist-2", "Focus", 1)],
+                "items": [self.playlists_by_id["playlist-2"]],
                 "total": 2,
             },
         }
@@ -87,43 +95,91 @@ class FakeSpotifyPlaylists:
 
     def playlist(self, playlist_id: str, fields: str | None = None):
         self.playlist_calls.append((playlist_id, fields))
-        return _playlist(playlist_id, "Road Trip", 2, image_url="https://img/playlist-1.jpg")
+        return self.playlists_by_id[playlist_id]
 
     def _get_id(self, item_type: str, item_id: str):
         if item_type != "playlist":
             raise AssertionError(f"Unexpected item_type: {item_type}")
         return item_id
 
+    def _get_uri(self, item_type: str, item_id: str):
+        if item_type != "track":
+            raise AssertionError(f"Unexpected item_type: {item_type}")
+        return item_id if item_id.startswith("spotify:") else f"spotify:track:{item_id}"
+
     def _get(self, url: str, **kwargs):
         self.playlist_items_calls.append((url, kwargs))
         offset = kwargs.get("offset", 0)
-        pages = {
-            0: {
-                "items": [
-                    _track_item(
-                        "track-1",
-                        "First Song",
-                        added_at="2026-04-01T10:00:00Z",
-                        position_suffix="1",
-                    )
-                ],
-                "total": 2,
-            },
-            1: {
-                "items": [
-                    _track_item(
-                        None,
-                        "Local File Song",
-                        added_at="2026-04-02T11:00:00Z",
-                        position_suffix="2",
-                        is_local=True,
-                        field_name="item",
-                    )
-                ],
-                "total": 2,
-            },
-        }
-        return pages.get(offset, {"items": [], "total": 2})
+        playlist_id = url.split("/")[1]
+
+        if playlist_id == "playlist-1":
+            pages = {
+                0: {
+                    "items": [
+                        _track_item(
+                            "track-1",
+                            "First Song",
+                            added_at="2026-04-01T10:00:00Z",
+                            position_suffix="1",
+                        )
+                    ],
+                    "total": 2,
+                },
+                1: {
+                    "items": [
+                        _track_item(
+                            None,
+                            "Local File Song",
+                            added_at="2026-04-02T11:00:00Z",
+                            position_suffix="2",
+                            is_local=True,
+                            field_name="item",
+                        )
+                    ],
+                    "total": 2,
+                },
+            }
+            return pages.get(offset, {"items": [], "total": 2})
+
+        if playlist_id == "playlist-transfer-source":
+            pages = {
+                0: {
+                    "items": [
+                        _track_item(
+                            "track-a",
+                            "Alpha Song",
+                            added_at="2026-03-01T08:00:00Z",
+                            position_suffix="transfer-a",
+                        ),
+                        _track_item(
+                            None,
+                            "Phone Local",
+                            added_at="2026-03-02T08:00:00Z",
+                            position_suffix="transfer-local",
+                            is_local=True,
+                            field_name="item",
+                        ),
+                        _track_item(
+                            "track-b",
+                            "Beta Song",
+                            added_at="2026-03-03T08:00:00Z",
+                            position_suffix="transfer-b",
+                        ),
+                    ],
+                    "total": 3,
+                },
+            }
+            return pages.get(offset, {"items": [], "total": 3})
+
+        return {"items": [], "total": 0}
+
+    def _post(self, url: str, payload=None, **kwargs):
+        self.post_calls.append((url, payload))
+        return {"snapshot_id": "snapshot-1"}
+
+    def _put(self, url: str, args=None, payload=None, **kwargs):
+        self.put_calls.append((url, args))
+        return None
 
 
 class PlaylistsApiTests(unittest.TestCase):
@@ -181,6 +237,79 @@ class PlaylistsApiTests(unittest.TestCase):
             ],
         )
         self.assertEqual(fake_sp.playlist_calls[0][0], "playlist-1")
+        self.assertIn("X-Request-ID", response.headers)
+
+    def test_append_playlist_endpoint_adds_tracks_to_another_playlist_at_the_top(self):
+        fake_sp = FakeSpotifyPlaylists()
+
+        with patch("backend.app.api.routes_playlists.get_spotify_client", return_value=fake_sp):
+            response = self.client.post(
+                "/playlists/append?account_role=target",
+                json={
+                    "source_playlist_id": "playlist-transfer-source",
+                    "target_type": "playlist",
+                    "target_playlist_id": "playlist-transfer-target",
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["tracks_added"], 2)
+        self.assertEqual(payload["skipped_tracks"], 1)
+        self.assertEqual(payload["target"]["kind"], "playlist")
+        self.assertEqual(payload["target"]["id"], "playlist-transfer-target")
+        self.assertEqual(
+            fake_sp.post_calls,
+            [
+                (
+                    "playlists/playlist-transfer-target/items",
+                    {"uris": ["spotify:track:track-a", "spotify:track:track-b"], "position": 0},
+                )
+            ],
+        )
+        self.assertEqual(
+            payload["warnings"],
+            ["Skipped 1 local track because Spotify cannot move local files between collections."],
+        )
+        self.assertIn("X-Request-ID", response.headers)
+
+    def test_append_playlist_endpoint_adds_tracks_to_liked_songs(self):
+        fake_sp = FakeSpotifyPlaylists()
+
+        with patch("backend.app.api.routes_playlists.get_spotify_client", return_value=fake_sp):
+            response = self.client.post(
+                "/playlists/append",
+                json={
+                    "source_playlist_id": "playlist-transfer-source",
+                    "target_type": "liked_tracks",
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["tracks_added"], 2)
+        self.assertEqual(payload["target"]["kind"], "liked_tracks")
+        self.assertEqual(
+            fake_sp.put_calls,
+            [("me/library", {"uris": "spotify:track:track-a,spotify:track:track-b"})],
+        )
+        self.assertIn("X-Request-ID", response.headers)
+
+    def test_append_playlist_endpoint_rejects_using_the_same_playlist_as_source_and_target(self):
+        fake_sp = FakeSpotifyPlaylists()
+
+        with patch("backend.app.api.routes_playlists.get_spotify_client", return_value=fake_sp):
+            response = self.client.post(
+                "/playlists/append",
+                json={
+                    "source_playlist_id": "playlist-transfer-source",
+                    "target_type": "playlist",
+                    "target_playlist_id": "playlist-transfer-source",
+                },
+            )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json()["detail"], "Choose a different target playlist.")
         self.assertIn("X-Request-ID", response.headers)
 
 

@@ -1,3 +1,4 @@
+import { PlaylistDropInTool } from "@/features/transfer-library/playlist-drop-in-tool"
 import { TransferLibraryTool } from "@/features/transfer-library/transfer-library-tool"
 import { Badge } from "@/components/ui/badge"
 
@@ -34,6 +35,7 @@ export function TransferLibraryPage() {
       </section>
 
       <TransferLibraryTool />
+      <PlaylistDropInTool />
     </div>
   )
 }

@@ -1,5 +1,8 @@
 import type {
+  AppendPlaylistPayload,
+  AppendPlaylistResponse,
   AuthStatus,
+  CurrentUserPlaylistsResponse,
   CreateLanguagePlaylistPayload,
   CreatePlaylistPayload,
   ExportSnapshotPayload,
@@ -259,6 +262,17 @@ export async function startLanguageGroupsJob() {
 
 export async function createPlaylistByLanguage(payload: CreateLanguagePlaylistPayload) {
   return request<PlaylistMutationResponse>("/create_playlist_by_language", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  })
+}
+
+export async function getCurrentUserPlaylists(accountRole?: SpotifyAccountRole) {
+  return request<CurrentUserPlaylistsResponse>(`/playlists${buildAccountRoleQuery(accountRole)}`)
+}
+
+export async function appendPlaylist(payload: AppendPlaylistPayload, accountRole?: SpotifyAccountRole) {
+  return request<AppendPlaylistResponse>(`/playlists/append${buildAccountRoleQuery(accountRole)}`, {
     method: "POST",
     body: JSON.stringify(payload),
   })

@@ -20,13 +20,13 @@ async function main() {
   assert.match(routerSource, /path:\s*"advanced"/)
   assert.match(routerSource, /path:\s*"auth\/callback"/)
 
-  const navigationSource = await read("src/app/navigation.ts")
+  const navigationSource = await read("src/routes/root/navigation.ts")
 
-  assert.match(navigationSource, /Connect Spotify/)
+  assert.match(navigationSource, /Dashboard/)
   assert.match(navigationSource, /Time Machine/)
   assert.match(navigationSource, /Transfer Library/)
   assert.match(navigationSource, /Advanced/)
-  assert.match(navigationSource, /Overview/)
+  assert.doesNotMatch(navigationSource, /Overview/)
 
   const apiSource = await read("src/lib/api.ts")
 
@@ -36,12 +36,22 @@ async function main() {
   assert.match(apiSource, /\/jobs\/export_account_snapshot/)
   assert.match(apiSource, /\/jobs\/import_account_snapshot/)
   assert.match(apiSource, /\/preview_account_snapshot_import/)
+  assert.match(apiSource, /\/playlists\/append/)
 
   const transferToolSource = await read("src/features/transfer-library/transfer-library-tool.tsx")
 
   assert.match(transferToolSource, /Preview import plan/)
   assert.match(transferToolSource, /Destructive changes/)
   assert.match(transferToolSource, /Snapshot import job/)
+
+  const transferRouteSource = await read("src/routes/transfer-library/route.tsx")
+
+  assert.match(transferRouteSource, /PlaylistDropInTool/)
+
+  const playlistDropInSource = await read("src/features/transfer-library/playlist-drop-in-tool.tsx")
+
+  assert.match(playlistDropInSource, /One playlist at a time/)
+  assert.match(playlistDropInSource, /Add playlist into target/)
 }
 
 main().catch((error) => {

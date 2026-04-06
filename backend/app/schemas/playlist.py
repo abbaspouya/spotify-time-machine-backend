@@ -1,3 +1,5 @@
+from typing import Literal
+
 from pydantic import BaseModel, Field
 
 
@@ -15,6 +17,12 @@ class CreateLanguagePlaylistRequest(BaseModel):
     language_code: str  # e.g. "en", "it", "fa"
     playlist_name: str | None = None
     min_songs: int = 5  # only create if enough songs
+
+
+class AppendPlaylistRequest(BaseModel):
+    source_playlist_id: str
+    target_type: Literal["liked_tracks", "playlist"]
+    target_playlist_id: str | None = None
 
 
 class PlaylistOwnerSummary(BaseModel):
@@ -70,3 +78,19 @@ class PlaylistTracksResponse(BaseModel):
     playlist: PlaylistSummary
     tracks: list[PlaylistTrackSummary]
     total_tracks: int
+
+
+class PlaylistAppendTargetSummary(BaseModel):
+    kind: Literal["liked_tracks", "playlist"]
+    id: str | None = None
+    name: str
+    spotify_url: str | None = None
+
+
+class AppendPlaylistResponse(BaseModel):
+    message: str
+    source_playlist: PlaylistSummary
+    target: PlaylistAppendTargetSummary
+    tracks_added: int
+    skipped_tracks: int = 0
+    warnings: list[str] = Field(default_factory=list)

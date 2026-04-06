@@ -97,6 +97,50 @@ export type PlaylistMutationResponse = {
   playlist_url: string
 }
 
+export type PlaylistOwnerSummary = {
+  id: string | null
+  display_name: string | null
+}
+
+export type PlaylistSummary = {
+  id: string
+  name: string
+  description: string
+  public: boolean | null
+  collaborative: boolean | null
+  owner: PlaylistOwnerSummary | null
+  image_url: string | null
+  spotify_url: string | null
+  track_count: number | null
+}
+
+export type CurrentUserPlaylistsResponse = {
+  playlists: PlaylistSummary[]
+  total_playlists: number
+}
+
+export type AppendPlaylistPayload = {
+  source_playlist_id: string
+  target_type: "liked_tracks" | "playlist"
+  target_playlist_id?: string
+}
+
+export type PlaylistAppendTargetSummary = {
+  kind: "liked_tracks" | "playlist"
+  id: string | null
+  name: string
+  spotify_url: string | null
+}
+
+export type AppendPlaylistResponse = {
+  message: string
+  source_playlist: PlaylistSummary
+  target: PlaylistAppendTargetSummary
+  tracks_added: number
+  skipped_tracks: number
+  warnings: string[]
+}
+
 export type LanguageGroupsResponse = {
   groups: Record<string, string[]>
 }
