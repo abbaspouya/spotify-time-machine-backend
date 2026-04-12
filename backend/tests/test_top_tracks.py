@@ -77,8 +77,8 @@ class FakeSpotifyRecentTracks:
 
 
 class TopTracksServiceTests(unittest.TestCase):
-    def test_resolve_top_tracks_timeframe_requires_days_for_custom(self):
-        with self.assertRaises(ValueError):
+    def test_resolve_top_tracks_timeframe_rejects_custom(self):
+        with self.assertRaisesRegex(ValueError, "Unsupported timeframe 'custom'"):
             resolve_top_tracks_timeframe("custom")
 
     @patch("backend.app.services.top_tracks._utc_now", return_value=FIXED_NOW)
@@ -120,14 +120,17 @@ class TopTracksApiTests(unittest.TestCase):
         self.assertEqual(payload["tracks"][0]["name"], "Short One")
         self.assertIn("X-Request-ID", response.headers)
 
-    def test_top_tracks_endpoint_requires_days_for_custom(self):
+    def test_top_tracks_endpoint_rejects_custom_timeframe(self):
         fake_sp = FakeSpotifyTopTracks()
 
         with patch("backend.app.api.routes_discovery.get_spotify_client", return_value=fake_sp):
             response = self.client.get("/top_tracks", params={"timeframe": "custom"})
 
         self.assertEqual(response.status_code, 400)
-        self.assertEqual(response.json()["detail"], "days is required when timeframe is 'custom'.")
+        self.assertEqual(
+            response.json()["detail"],
+            "Unsupported timeframe 'custom'. Use one of: 1_week, 4_weeks, 6_months, lifetime.",
+        )
 
 
 if __name__ == "__main__":

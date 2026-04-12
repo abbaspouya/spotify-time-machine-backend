@@ -5,13 +5,12 @@ import { CalendarRange, ExternalLink, LoaderCircle, Music2, RefreshCcw, Trending
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Input } from "@/components/ui/input"
 import { getErrorMessage } from "@/features/spotify/use-spotify-session"
 import { getTopTracks } from "@/lib/api"
 import type { TopTrack, TopTracksRequest, TopTracksTimeframeKey } from "@/lib/types"
 import { cn } from "@/lib/utils"
 
-const presetOptions: Array<{ key: Exclude<TopTracksTimeframeKey, "custom">; label: string }> = [
+const presetOptions: Array<{ key: TopTracksTimeframeKey; label: string }> = [
   { key: "1_week", label: "1 Week" },
   { key: "4_weeks", label: "4 Weeks" },
   { key: "6_months", label: "6 Months" },
@@ -55,13 +54,11 @@ export function TopTracksRecap({
   onRetrySession,
 }: TopTracksRecapProps) {
   const [request, setRequest] = useState<TopTracksRequest>({ timeframe: "4_weeks", limit: 50 })
-  const [customDaysInput, setCustomDaysInput] = useState("14")
-  const [customError, setCustomError] = useState<string | null>(null)
 
   const topTracksEnabled = hasRequiredTopTrackScopes(scope)
 
   const topTracksQuery = useQuery({
-    queryKey: ["topTracks", request.timeframe, request.days ?? null, request.limit ?? 50],
+    queryKey: ["topTracks", request.timeframe, request.limit ?? 50],
     queryFn: () => getTopTracks(request),
     enabled: topTracksEnabled && canLoad,
     staleTime: 5 * 60_000,
@@ -70,27 +67,13 @@ export function TopTracksRecap({
 
   const selectedLabel =
     topTracksQuery.data?.selected_timeframe.label ||
-    (request.timeframe === "custom" && request.days ? formatWindowMeta(request.days) : undefined) ||
     presetOptions.find((option) => option.key === request.timeframe)?.label ||
     "4 Weeks"
 
   const featuredTrack = topTracksQuery.data?.tracks[0]
 
-  const applyPreset = (timeframe: Exclude<TopTracksTimeframeKey, "custom">) => {
-    setCustomError(null)
+  const applyPreset = (timeframe: TopTracksTimeframeKey) => {
     setRequest({ timeframe, limit: 50 })
-  }
-
-  const applyCustomDays = () => {
-    const parsed = Number(customDaysInput)
-
-    if (!Number.isInteger(parsed) || parsed < 1 || parsed > 365) {
-      setCustomError("Choose a whole number of days between 1 and 365.")
-      return
-    }
-
-    setCustomError(null)
-    setRequest({ timeframe: "custom", days: parsed, limit: 50 })
   }
 
   return (
@@ -140,26 +123,6 @@ export function TopTracksRecap({
                 })}
               </div>
             </div>
-
-            <div className="rounded-[30px] border border-white/10 bg-white/5 p-4">
-              <div className="flex flex-col gap-3 sm:flex-row">
-                <Input
-                  type="number"
-                  min={1}
-                  max={365}
-                  value={customDaysInput}
-                  onChange={(event) => setCustomDaysInput(event.target.value)}
-                  placeholder="Custom days"
-                />
-                <Button type="button" variant={request.timeframe === "custom" ? "default" : "outline"} onClick={applyCustomDays}>
-                  Apply custom
-                </Button>
-              </div>
-              <p className="mt-3 text-xs text-muted-foreground">
-                Presets stay visible, but you can still request any 1 to 365 day window from recent-play history.
-              </p>
-              {customError ? <p className="mt-2 text-sm text-destructive">{customError}</p> : null}
-            </div>
           </div>
         </CardHeader>
 
@@ -171,7 +134,7 @@ export function TopTracksRecap({
                   <p className="text-lg font-semibold text-foreground">Reconnect Spotify to unlock top songs.</p>
                   <p className="max-w-2xl text-sm text-muted-foreground">
                     This recap needs the newer `user-top-read` and `user-read-recently-played` scopes. Reconnect once
-                    and the dashboard can load the recap cards and custom windows.
+                    and the dashboard can load the recap cards.
                   </p>
                 </div>
                 <Button onClick={onReconnect}>Reconnect Spotify</Button>
@@ -245,8 +208,7 @@ export function TopTracksRecap({
             <div className="rounded-[30px] border border-white/10 bg-white/5 p-5">
               <p className="text-lg font-semibold text-foreground">No top-song data came back for this window.</p>
               <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-                Try another preset or a shorter custom window. Recent-play windows only work when Spotify has plays in
-                that range.
+                Try another preset. Recent-play windows only work when Spotify has plays in that range.
               </p>
             </div>
           ) : (

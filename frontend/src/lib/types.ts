@@ -16,11 +16,10 @@ export type SpotifyAccountIdentity = {
   product: string | null
 }
 
-export type TopTracksTimeframeKey = "1_week" | "4_weeks" | "6_months" | "lifetime" | "custom"
+export type TopTracksTimeframeKey = "1_week" | "4_weeks" | "6_months" | "lifetime"
 
 export type TopTracksRequest = {
   timeframe: TopTracksTimeframeKey
-  days?: number
   limit?: number
 }
 

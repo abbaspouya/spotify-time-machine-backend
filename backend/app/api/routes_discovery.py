@@ -32,23 +32,22 @@ def search_artists_endpoint(
 @router.get("/top_tracks", summary="Get top tracks recap")
 def top_tracks_endpoint(
     request: Request,
-    timeframe: str = Query("4_weeks", description="One of: 1_week, 4_weeks, 6_months, lifetime, custom"),
-    days: int | None = Query(None, ge=1, le=365, description="Required when timeframe=custom"),
+    timeframe: str = Query("4_weeks", description="One of: 1_week, 4_weeks, 6_months, lifetime"),
     limit: int = Query(50, ge=1, le=50, description="Max number of tracks to return"),
 ):
     logger.info(
         "spotify_top_tracks_fetch_started",
-        extra={"method": request.method, "path": request.url.path, "timeframe": timeframe, "days": days, "limit": limit},
+        extra={"method": request.method, "path": request.url.path, "timeframe": timeframe, "limit": limit},
     )
     sp = get_spotify_client(request)
 
     try:
-        result = get_top_tracks_summary(sp, timeframe=timeframe, days=days, limit=limit)
+        result = get_top_tracks_summary(sp, timeframe=timeframe, limit=limit)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     logger.info(
         "spotify_top_tracks_fetch_completed",
-        extra={"method": request.method, "path": request.url.path, "timeframe": timeframe, "days": days, "limit": limit},
+        extra={"method": request.method, "path": request.url.path, "timeframe": timeframe, "limit": limit},
     )
     return result

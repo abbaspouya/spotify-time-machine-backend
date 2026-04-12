@@ -203,7 +203,6 @@ export async function getTopTracks(payload: TopTracksRequest) {
   return request<TopTracksResponse>(
     `/top_tracks${buildQuery({
       timeframe: payload.timeframe,
-      days: payload.days,
       limit: payload.limit ?? 50,
     })}`,
   )

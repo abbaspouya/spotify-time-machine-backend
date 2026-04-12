@@ -35,7 +35,6 @@ class JsonLogFormatter(logging.Formatter):
             "job_kind",
             "account_role",
             "timeframe",
-            "days",
             "limit",
             "playlist_id",
             "playlist_name",

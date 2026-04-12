@@ -63,34 +63,11 @@ def _format_iso_datetime(value: datetime | None) -> str | None:
     return value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
-def _format_custom_label(days: int) -> str:
-    if days == 1:
-        return "1 Day"
-    if days == 7:
-        return "7 Days"
-    return f"{days} Days"
-
-
-def resolve_top_tracks_timeframe(timeframe: str, days: int | None = None) -> dict[str, Any]:
+def resolve_top_tracks_timeframe(timeframe: str) -> dict[str, Any]:
     normalized = timeframe.strip().lower()
 
-    if normalized == "custom":
-        if days is None:
-            raise ValueError("days is required when timeframe is 'custom'.")
-        if days < 1 or days > 365:
-            raise ValueError("days must be between 1 and 365.")
-
-        return {
-            "key": "custom",
-            "label": _format_custom_label(days),
-            "mode": "recent_window",
-            "days": days,
-            "description": f"Calculated from your recently played history over the last {days} days.",
-            "disclaimer": "Custom windows are based on recently played history and can become partial for very active accounts.",
-        }
-
     if normalized not in PRESET_TIMEFRAMES:
-        allowed = ", ".join(sorted([*PRESET_TIMEFRAMES.keys(), "custom"]))
+        allowed = ", ".join(sorted(PRESET_TIMEFRAMES.keys()))
         raise ValueError(f"Unsupported timeframe '{timeframe}'. Use one of: {allowed}.")
 
     return PRESET_TIMEFRAMES[normalized]
@@ -242,10 +219,9 @@ def get_top_tracks_summary(
     sp: spotipy.Spotify,
     *,
     timeframe: str = "4_weeks",
-    days: int | None = None,
     limit: int = 50,
 ) -> dict[str, Any]:
-    resolved = resolve_top_tracks_timeframe(timeframe, days=days)
+    resolved = resolve_top_tracks_timeframe(timeframe)
 
     if limit < 1 or limit > 50:
         raise ValueError("limit must be between 1 and 50.")
