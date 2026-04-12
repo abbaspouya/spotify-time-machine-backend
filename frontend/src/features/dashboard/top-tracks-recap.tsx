@@ -1,6 +1,6 @@
 import { useState } from "react"
 import { useQuery } from "@tanstack/react-query"
-import { CalendarRange, ExternalLink, LoaderCircle, Music2, RefreshCcw, TrendingUp } from "lucide-react"
+import { ExternalLink, LoaderCircle, Music2, RefreshCcw } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
@@ -25,14 +25,6 @@ function hasRequiredTopTrackScopes(scope: string | null | undefined) {
 
 function formatArtists(track: TopTrack) {
   return track.artist_names.length > 0 ? track.artist_names.join(", ") : "Unknown artist"
-}
-
-function formatWindowMeta(days?: number | null) {
-  if (!days) {
-    return "Spotify top tracks"
-  }
-
-  return days === 1 ? "Last 1 day" : `Last ${days} days`
 }
 
 type TopTracksRecapProps = {
@@ -186,7 +178,7 @@ export function TopTracksRecap({
             </div>
           ) : (
             <>
-              <div className="grid gap-4 xl:grid-cols-[0.88fr_1.12fr]">
+              <div>
                 <div className="overflow-hidden rounded-[34px] bg-[linear-gradient(135deg,#1db954,#1f2937_46%,#0f172a)] p-5 text-white shadow-[0_28px_70px_rgba(0,0,0,0.24)]">
                   <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/75">Current number one</p>
 
@@ -207,81 +199,12 @@ export function TopTracksRecap({
                     </div>
 
                     <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span className="rounded-full border border-white/15 bg-white/12 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-white/80">
-                          {topTracksQuery.data.selected_timeframe.label}
-                        </span>
-                        <span className="rounded-full border border-white/15 bg-white/12 px-3 py-1 text-xs font-medium text-white/80">
-                          {formatWindowMeta(topTracksQuery.data.selected_timeframe.days)}
-                        </span>
-                      </div>
-
-                      <p className="mt-4 truncate text-3xl font-semibold leading-tight">{featuredTrack?.name || "Unknown track"}</p>
+                      <p className="truncate text-3xl font-semibold leading-tight">{featuredTrack?.name || "Unknown track"}</p>
                       <p className="mt-2 truncate text-base text-white/80">{featuredTrack ? formatArtists(featuredTrack) : "Unknown artist"}</p>
                       <p className="mt-1 truncate text-sm text-white/60">{featuredTrack?.album_name || "Unknown album"}</p>
-
-                      <div className="mt-4 flex flex-wrap gap-2">
-                        <span className="rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-slate-900">
-                          #{featuredTrack?.rank ?? 1}
-                        </span>
-                        {featuredTrack?.play_count ? (
-                          <span className="rounded-full border border-white/15 bg-white/12 px-3 py-1.5 text-xs font-medium text-white/80">
-                            {featuredTrack.play_count} plays
-                          </span>
-                        ) : (
-                          <span className="rounded-full border border-white/15 bg-white/12 px-3 py-1.5 text-xs font-medium text-white/80">
-                            Spotify rank
-                          </span>
-                        )}
-                      </div>
                     </div>
                   </div>
                 </div>
-
-                <div className="grid gap-3 sm:grid-cols-3">
-                  <div className="rounded-[28px] border border-white/10 bg-white/5 p-4">
-                    <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary/12 text-primary">
-                      <TrendingUp className="h-5 w-5" />
-                    </div>
-                    <p className="mt-4 text-xs font-semibold uppercase tracking-[0.16em] text-foreground/55">Window</p>
-                    <p className="mt-2 text-2xl font-semibold text-foreground">{topTracksQuery.data.selected_timeframe.label}</p>
-                    <p className="mt-2 text-sm text-muted-foreground">{topTracksQuery.data.selected_timeframe.description}</p>
-                  </div>
-
-                  <div className="rounded-[28px] border border-white/10 bg-white/5 p-4">
-                    <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary/12 text-primary">
-                      <Music2 className="h-5 w-5" />
-                    </div>
-                    <p className="mt-4 text-xs font-semibold uppercase tracking-[0.16em] text-foreground/55">Loaded</p>
-                    <p className="mt-2 text-2xl font-semibold text-foreground">{topTracksQuery.data.track_count}</p>
-                    <p className="mt-2 text-sm text-muted-foreground">
-                      {topTracksQuery.data.total_unique_tracks} distinct tracks ranked for this selection.
-                    </p>
-                  </div>
-
-                  <div className="rounded-[28px] border border-white/10 bg-white/5 p-4">
-                    <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary/12 text-primary">
-                      <CalendarRange className="h-5 w-5" />
-                    </div>
-                    <p className="mt-4 text-xs font-semibold uppercase tracking-[0.16em] text-foreground/55">Source</p>
-                    <p className="mt-2 text-2xl font-semibold text-foreground">
-                      {topTracksQuery.data.scanned_plays ?? "Spotify"}
-                    </p>
-                    <p className="mt-2 text-sm text-muted-foreground">
-                      {topTracksQuery.data.scanned_plays
-                        ? `${topTracksQuery.data.scanned_plays} plays scanned in the recent window.`
-                        : topTracksQuery.data.source_note}
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-                <span className="metric-pill">{topTracksQuery.data.source_note}</span>
-                {topTracksQuery.data.is_partial ? <span className="metric-pill">Recent-play window is partial</span> : null}
-                {topTracksQuery.data.selected_timeframe.disclaimer ? (
-                  <span className="metric-pill">{topTracksQuery.data.selected_timeframe.disclaimer}</span>
-                ) : null}
               </div>
 
               <div className="overflow-x-auto pb-2">
@@ -322,15 +245,6 @@ export function TopTracksRecap({
 
                       <div className="mt-3 flex items-center justify-between gap-2">
                         <p className="text-sm font-semibold text-primary">#{track.rank}</p>
-                        {track.play_count ? (
-                          <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] font-medium text-foreground/70">
-                            {track.play_count} plays
-                          </span>
-                        ) : (
-                          <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] font-medium text-foreground/55">
-                            Spotify rank
-                          </span>
-                        )}
                       </div>
 
                       <div className="mt-3 space-y-1">
