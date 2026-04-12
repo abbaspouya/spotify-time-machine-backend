@@ -99,6 +99,8 @@ export function TopTracksRecap({
   const gallerySubtitle = isExpanded
     ? `Showing all ${tracks.length} tracks for ${selectedTimeframeLabel}.`
     : `Showing ${Math.min(currentPageStart + 1, tracks.length)}-${Math.min(currentPageStart + tracksPerPage, tracks.length)} of ${tracks.length} tracks for ${selectedTimeframeLabel}.`
+  const headerSubtitle =
+    topTracksQuery.isSuccess && tracks.length > 0 ? gallerySubtitle : `Your top tracks for ${selectedTimeframeLabel}.`
 
   const applyPreset = (timeframe: TopTracksTimeframeKey) => {
     setRequest({ timeframe, limit: 50 })
@@ -146,27 +148,33 @@ export function TopTracksRecap({
     <section className="animate-fade-up">
       <Card className="overflow-hidden border-white/10 bg-card/90">
         <CardHeader className="border-b border-white/10 pb-5">
-          <div className="flex w-full justify-end">
-            <div className="w-full max-w-xl">
-              <div className="rounded-[30px] border border-white/10 bg-white/5 p-2">
-                <div className="grid gap-2 sm:grid-cols-4">
-                  {presetOptions.map((option) => {
-                    const isActive = request.timeframe === option.key
+          <div className="flex w-full justify-start lg:justify-end">
+            <div className="w-full lg:max-w-xl lg:flex-none">
+              <div className="w-full lg:min-w-[520px]">
+                <p className="mb-2 px-1 text-xs font-semibold uppercase tracking-[0.18em] text-foreground/45 lg:text-right">
+                  Time range
+                </p>
 
-                    return (
-                      <button
-                        key={option.key}
-                        type="button"
-                        onClick={() => applyPreset(option.key)}
-                        className={cn(
-                          "rounded-2xl px-4 py-3 text-sm font-medium transition-colors",
-                          isActive ? "bg-primary text-primary-foreground shadow-glow" : "bg-transparent text-foreground/72 hover:bg-white/5 hover:text-foreground",
-                        )}
-                      >
-                        {option.label}
-                      </button>
-                    )
-                  })}
+                <div className="rounded-[30px] border border-white/10 bg-white/5 p-2">
+                  <div className="grid gap-2 sm:grid-cols-4">
+                    {presetOptions.map((option) => {
+                      const isActive = request.timeframe === option.key
+
+                      return (
+                        <button
+                          key={option.key}
+                          type="button"
+                          onClick={() => applyPreset(option.key)}
+                          className={cn(
+                            "rounded-2xl px-4 py-3 text-sm font-medium transition-colors",
+                            isActive ? "bg-primary text-primary-foreground shadow-glow" : "bg-transparent text-foreground/72 hover:bg-white/5 hover:text-foreground",
+                          )}
+                        >
+                          {option.label}
+                        </button>
+                      )
+                    })}
+                  </div>
                 </div>
               </div>
             </div>
@@ -174,6 +182,11 @@ export function TopTracksRecap({
         </CardHeader>
 
         <CardContent className="space-y-5 pt-6">
+          <div className="space-y-2">
+            <h2 className="text-3xl font-semibold text-foreground">Top tracks</h2>
+            <p className="text-sm text-muted-foreground">{headerSubtitle}</p>
+          </div>
+
           {!topTracksEnabled ? (
             <div className="rounded-[30px] border border-primary/20 bg-primary/10 p-5">
               <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
@@ -298,12 +311,7 @@ export function TopTracksRecap({
               </div>
 
               <div className="space-y-6 rounded-[34px] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.015))] p-5">
-                <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-                  <div className="space-y-2">
-                    <h2 className="text-3xl font-semibold text-foreground">Top tracks</h2>
-                    <p className="text-sm text-muted-foreground">{gallerySubtitle}</p>
-                  </div>
-
+                <div className="flex justify-end">
                   <div className="flex items-center gap-2 self-start">
                     <button
                       type="button"
