@@ -2,9 +2,8 @@ import { useState } from "react"
 import { useQuery } from "@tanstack/react-query"
 import { CalendarRange, ExternalLink, LoaderCircle, Music2, RefreshCcw, TrendingUp } from "lucide-react"
 
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { getErrorMessage } from "@/features/spotify/use-spotify-session"
 import { getTopTracks } from "@/lib/api"
 import type { TopTrack, TopTracksRequest, TopTracksTimeframeKey } from "@/lib/types"
@@ -37,7 +36,6 @@ function formatWindowMeta(days?: number | null) {
 }
 
 type TopTracksRecapProps = {
-  displayName?: string | null
   scope?: string | null
   canLoad?: boolean
   blockedError?: unknown
@@ -46,7 +44,6 @@ type TopTracksRecapProps = {
 }
 
 export function TopTracksRecap({
-  displayName,
   scope,
   canLoad = true,
   blockedError,
@@ -65,11 +62,6 @@ export function TopTracksRecap({
     retry: false,
   })
 
-  const selectedLabel =
-    topTracksQuery.data?.selected_timeframe.label ||
-    presetOptions.find((option) => option.key === request.timeframe)?.label ||
-    "4 Weeks"
-
   const featuredTrack = topTracksQuery.data?.tracks[0]
 
   const applyPreset = (timeframe: TopTracksTimeframeKey) => {
@@ -79,48 +71,29 @@ export function TopTracksRecap({
   return (
     <section className="animate-fade-up">
       <Card className="overflow-hidden border-white/10 bg-card/90">
-        <CardHeader className="gap-6 border-b border-white/10 pb-6 lg:flex-row lg:items-start lg:justify-between">
-          <div className="space-y-4">
-            <div className="flex flex-wrap items-center gap-3">
-              <span className="hero-badge">Listening recap</span>
-              <Badge variant="outline">50-track view</Badge>
-            </div>
+        <CardHeader className="border-b border-white/10 pb-5">
+          <div className="flex w-full justify-end">
+            <div className="w-full max-w-xl">
+              <div className="rounded-[30px] border border-white/10 bg-white/5 p-2">
+                <div className="grid gap-2 sm:grid-cols-4">
+                  {presetOptions.map((option) => {
+                    const isActive = request.timeframe === option.key
 
-            <div className="space-y-2">
-              <CardTitle className="text-3xl md:text-4xl">Top songs</CardTitle>
-              <CardDescription className="max-w-2xl text-sm md:text-base">
-                Start the dashboard with the songs you are returning to most, then jump into Time Machine or transfer
-                work after you have a feel for the account.
-              </CardDescription>
-            </div>
-
-            <div className="flex flex-wrap gap-2 text-sm text-muted-foreground">
-              <span className="metric-pill">{displayName ? `${displayName}'s listening` : "Your listening"}</span>
-              <span className="metric-pill">{selectedLabel}</span>
-              <span className="metric-pill">{request.limit ?? 50} tracks</span>
-            </div>
-          </div>
-
-          <div className="w-full max-w-xl space-y-3">
-            <div className="rounded-[30px] border border-white/10 bg-white/5 p-2">
-              <div className="grid gap-2 sm:grid-cols-4">
-                {presetOptions.map((option) => {
-                  const isActive = request.timeframe === option.key
-
-                  return (
-                    <button
-                      key={option.key}
-                      type="button"
-                      onClick={() => applyPreset(option.key)}
-                      className={cn(
-                        "rounded-2xl px-4 py-3 text-sm font-medium transition-colors",
-                        isActive ? "bg-primary text-primary-foreground shadow-glow" : "bg-transparent text-foreground/72 hover:bg-white/5 hover:text-foreground",
-                      )}
-                    >
-                      {option.label}
-                    </button>
-                  )
-                })}
+                    return (
+                      <button
+                        key={option.key}
+                        type="button"
+                        onClick={() => applyPreset(option.key)}
+                        className={cn(
+                          "rounded-2xl px-4 py-3 text-sm font-medium transition-colors",
+                          isActive ? "bg-primary text-primary-foreground shadow-glow" : "bg-transparent text-foreground/72 hover:bg-white/5 hover:text-foreground",
+                        )}
+                      >
+                        {option.label}
+                      </button>
+                    )
+                  })}
+                </div>
               </div>
             </div>
           </div>

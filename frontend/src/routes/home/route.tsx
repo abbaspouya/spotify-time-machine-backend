@@ -17,7 +17,6 @@ export function HomePage() {
   return (
     <div className="container space-y-8 py-8 md:py-12">
       <TopTracksRecap
-        displayName={whoAmIQuery.data?.display_name || whoAmIQuery.data?.id}
         scope={authStatusQuery.data?.scope}
         canLoad={canLoadTopTracks}
         blockedError={topTracksBlockedError}
