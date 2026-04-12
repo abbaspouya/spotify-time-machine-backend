@@ -51,6 +51,14 @@ const config: Config = {
           "0%": { opacity: "0", transform: "translateY(18px)" },
           "100%": { opacity: "1", transform: "translateY(0)" },
         },
+        "track-page-in-right": {
+          "0%": { opacity: "0", transform: "translateX(26px) scale(0.985)" },
+          "100%": { opacity: "1", transform: "translateX(0) scale(1)" },
+        },
+        "track-page-in-left": {
+          "0%": { opacity: "0", transform: "translateX(-26px) scale(0.985)" },
+          "100%": { opacity: "1", transform: "translateX(0) scale(1)" },
+        },
         pulseborder: {
           "0%, 100%": { boxShadow: "0 0 0 0 rgba(29, 185, 84, 0.12)" },
           "50%": { boxShadow: "0 0 0 10px rgba(29, 185, 84, 0)" },
@@ -58,6 +66,8 @@ const config: Config = {
       },
       animation: {
         "fade-up": "fade-up 0.55s ease-out both",
+        "track-page-in-right": "track-page-in-right 0.34s cubic-bezier(0.22, 1, 0.36, 1) both",
+        "track-page-in-left": "track-page-in-left 0.34s cubic-bezier(0.22, 1, 0.36, 1) both",
         pulseborder: "pulseborder 2.3s ease-in-out infinite",
       },
     },
