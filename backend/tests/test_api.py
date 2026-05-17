@@ -39,6 +39,20 @@ class ApiContractTests(unittest.TestCase):
         self.assertEqual(response.json(), {"authenticated": False})
         self.assertIn("X-Request-ID", response.headers)
 
+    def test_auth_status_preflight_allows_alternate_loopback_vite_port(self):
+        response = self.client.options(
+            "/auth_status?account_role=source",
+            headers={
+                "origin": "http://127.0.0.1:5174",
+                "access-control-request-method": "GET",
+                "access-control-request-headers": "content-type",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.headers.get("access-control-allow-origin"), "http://127.0.0.1:5174")
+        self.assertEqual(response.headers.get("access-control-allow-credentials"), "true")
+
     def test_jobs_require_an_authenticated_session(self):
         response = self.client.post(
             "/jobs/fetch_and_group",
@@ -225,6 +239,54 @@ class ApiContractTests(unittest.TestCase):
 
             self.assertEqual(auth_status_response.status_code, 200)
             self.assertTrue(auth_status_response.json()["authenticated"])
+
+    def test_callback_preserves_alternate_loopback_frontend_origin(self):
+        with TestClient(app) as client:
+            login_response = client.get(
+                "/login",
+                params={"raw": True},
+                headers={"referer": "http://127.0.0.1:5174/app/time-machine"},
+            )
+
+            self.assertEqual(login_response.status_code, 200)
+            auth_url = login_response.json()["auth_url"]
+            state = parse_qs(urlsplit(auth_url).query)["state"][0]
+
+            token_info = {
+                "access_token": "test-access-token",
+                "token_type": "Bearer",
+                "scope": SPOTIFY_SCOPE,
+                "expires_at": int(time()) + 3600,
+            }
+
+            def fake_get_oauth_for_session(callback_session_id: str, account_role: str):
+                class FakeCacheHandler:
+                    def save_token_to_cache(self, value):
+                        save_token_info(callback_session_id, value, account_role)
+
+                class FakeOAuth:
+                    cache_handler = FakeCacheHandler()
+
+                    def get_access_token(self, code, as_dict=True):
+                        self.last_code = code
+                        self.last_as_dict = as_dict
+                        return token_info
+
+                return FakeOAuth()
+
+            with patch("backend.app.api.routes_auth.get_oauth_for_session", side_effect=fake_get_oauth_for_session):
+                callback_response = client.get(
+                    "/callback",
+                    params={"code": "test-code", "state": state},
+                    follow_redirects=False,
+                )
+
+        self.assertEqual(callback_response.status_code, 303)
+        self.assertTrue(
+            callback_response.headers["location"].startswith(
+                "http://127.0.0.1:5174/auth/callback?status=success"
+            )
+        )
 
 
 if __name__ == "__main__":

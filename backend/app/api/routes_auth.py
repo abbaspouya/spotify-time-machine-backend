@@ -5,7 +5,7 @@ from fastapi import APIRouter, Query, Request
 from fastapi.responses import JSONResponse, RedirectResponse
 
 from ..core.auth import DEFAULT_ACCOUNT_ROLE, get_oauth_for_session, get_spotify_client, normalize_account_role
-from ..core.config import CORS_ALLOW_ORIGINS
+from ..core.config import is_allowed_cors_origin
 from ..core.observability import get_logger
 from ..core.session_store import (
     clear_session_cookie,
@@ -51,7 +51,7 @@ def _extract_origin(value: str | None) -> str | None:
 def _resolve_frontend_origin(request: Request) -> str | None:
     for header_name in ("origin", "referer"):
         origin = _extract_origin(request.headers.get(header_name))
-        if origin and origin in CORS_ALLOW_ORIGINS:
+        if is_allowed_cors_origin(origin):
             return origin
 
     return None

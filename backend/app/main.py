@@ -7,7 +7,7 @@ from spotipy.exceptions import SpotifyException
 
 from .api.docs import API_TAGS
 from .api.routes_spotify import router as spotify_router
-from .core.config import CORS_ALLOW_ORIGINS
+from .core.config import CORS_ALLOW_ORIGINS, CORS_ALLOW_ORIGIN_REGEX
 from .core.observability import (
     get_logger,
     http_exception_handler,
@@ -28,6 +28,7 @@ logger = get_logger("http")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=CORS_ALLOW_ORIGINS,
+    allow_origin_regex=CORS_ALLOW_ORIGIN_REGEX,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

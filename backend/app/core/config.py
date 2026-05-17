@@ -1,4 +1,5 @@
 import os
+import re
 from pathlib import Path
 from urllib.parse import urlsplit
 
@@ -35,6 +36,14 @@ def _validate_absolute_url(name: str, url: str) -> None:
     parsed = urlsplit(url)
     if not parsed.scheme or not parsed.netloc:
         raise RuntimeError(f"{name} must include a scheme and host, for example http://127.0.0.1:8000/callback")
+
+
+def _build_default_cors_origin_regex(frontend_url: str) -> str | None:
+    frontend_host = urlsplit(frontend_url).hostname
+    if frontend_host not in {"127.0.0.1", "localhost"}:
+        return None
+
+    return r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$"
 
 
 _validate_absolute_url("SPOTIFY_REDIRECT_URI", SPOTIFY_REDIRECT_URI)
@@ -79,6 +88,8 @@ _default_cors_origins = [
 ]
 
 CORS_ALLOW_ORIGINS = list(dict.fromkeys(_parse_csv_env("CORS_ALLOW_ORIGINS", _default_cors_origins)))
+_default_cors_origin_regex = _build_default_cors_origin_regex(FRONTEND_URL) or ""
+CORS_ALLOW_ORIGIN_REGEX = os.getenv("CORS_ALLOW_ORIGIN_REGEX", _default_cors_origin_regex).strip() or None
 SPOTIFY_SCOPE = (
     "playlist-read-private playlist-read-collaborative "
     "playlist-modify-private playlist-modify-public "
@@ -111,3 +122,14 @@ if JOB_RETENTION_SECONDS <= 0:
 
 if SPOTIFY_REQUEST_TIMEOUT_SECONDS <= 0:
     raise RuntimeError("SPOTIFY_REQUEST_TIMEOUT_SECONDS must be greater than zero.")
+
+
+def is_allowed_cors_origin(origin: str | None) -> bool:
+    if not origin:
+        return False
+
+    normalized_origin = origin.strip().rstrip("/")
+    if normalized_origin in CORS_ALLOW_ORIGINS:
+        return True
+
+    return bool(CORS_ALLOW_ORIGIN_REGEX and re.fullmatch(CORS_ALLOW_ORIGIN_REGEX, normalized_origin))
