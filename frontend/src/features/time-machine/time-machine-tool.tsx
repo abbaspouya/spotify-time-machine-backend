@@ -9,6 +9,7 @@ import { AuthRequiredNotice } from "@/features/spotify/auth-required-notice"
 import { getErrorMessage, useSpotifySession } from "@/features/spotify/use-spotify-session"
 import { JobStatusCard } from "@/features/jobs/job-status-card"
 import { isActiveJobStatus, useAsyncJob } from "@/features/jobs/use-async-job"
+import { FeatureIntro } from "@/components/feature-intro"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -51,6 +52,12 @@ const timelinePreview = [
   { label: "Mar 2020", tracks: "46 tracks", width: "78%" },
   { label: "Apr 2020", tracks: "33 tracks", width: "58%" },
   { label: "May 2020", tracks: "61 tracks", width: "92%" },
+]
+
+const timeMachineIntroPoints = [
+  { title: "Choose a range", description: "Start with all years, or narrow it down." },
+  { title: "Preview the slices", description: "See each period before creating anything." },
+  { title: "Save to Spotify", description: "The finished playlist lands in your library." },
 ]
 
 function groupCardLabel(groupKey: string, trackIds: string[]) {
@@ -138,41 +145,13 @@ export function TimeMachineTool() {
 
   return (
     <section id="time-machine-tool" className="section-shell animate-fade-up overflow-hidden">
-      <div className="grid gap-8 rounded-[28px] border border-primary/15 bg-gradient-to-br from-primary/12 via-card to-card p-5 md:p-8 lg:grid-cols-[minmax(0,1fr)_420px]">
-        <div className="flex max-w-3xl flex-col justify-center space-y-5">
-          <div className="flex items-center gap-3 text-primary">
-            <Sparkles className="h-5 w-5" />
-            <p className="text-xs font-semibold uppercase tracking-[0.22em]">Spotify Time Machine</p>
-          </div>
-          <div className="space-y-4">
-            <h1 className="text-4xl leading-tight md:text-5xl">Create playlists from any chapter of your liked songs.</h1>
-            <p className="text-base text-muted-foreground md:text-lg">
-              Choose a period of time from your Spotify history, such as monthly, quarterly, half-yearly, or yearly.
-              Time Machine groups the songs you liked during that period so you can pick the moment you want to hear
-              again.
-            </p>
-            <p className="text-base text-muted-foreground md:text-lg">
-              When you create the playlist, it is added directly to your Spotify account and you can open it there
-              right away.
-            </p>
-          </div>
-          <div className="grid gap-4 border-t border-white/10 pt-5 sm:grid-cols-3">
-            <div className="space-y-1">
-              <p className="text-sm font-semibold text-foreground">Choose a range</p>
-              <p className="text-sm text-muted-foreground">Start with all years, or narrow it down.</p>
-            </div>
-            <div className="space-y-1">
-              <p className="text-sm font-semibold text-foreground">Preview the slices</p>
-              <p className="text-sm text-muted-foreground">See each period before creating anything.</p>
-            </div>
-            <div className="space-y-1">
-              <p className="text-sm font-semibold text-foreground">Save to Spotify</p>
-              <p className="text-sm text-muted-foreground">The finished playlist lands in your library.</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="rounded-[26px] border border-white/10 bg-background/55 p-5 shadow-panel">
+      <FeatureIntro
+        eyebrow="Spotify Time Machine"
+        icon={Sparkles}
+        points={timeMachineIntroPoints}
+        title="Create playlists from any chapter of your liked songs."
+        visual={
+          <>
           <div className="flex items-center gap-3">
             <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary/15 text-primary">
               <CalendarRange className="h-5 w-5" />
@@ -206,8 +185,18 @@ export function TimeMachineTool() {
               </p>
             </div>
           </div>
-        </div>
-      </div>
+          </>
+        }
+      >
+        <p className="text-base text-muted-foreground md:text-lg">
+          Choose a period of time from your Spotify history, such as monthly, quarterly, half-yearly, or yearly. Time
+          Machine groups the songs you liked during that period so you can pick the moment you want to hear again.
+        </p>
+        <p className="text-base text-muted-foreground md:text-lg">
+          When you create the playlist, it is added directly to your Spotify account and you can open it there right
+          away.
+        </p>
+      </FeatureIntro>
 
       <div className="relative mt-8 grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
         <div className="pointer-events-none absolute bottom-10 left-1/2 top-10 hidden w-px -translate-x-1/2 bg-gradient-to-b from-primary/0 via-primary/25 to-primary/0 xl:block" />

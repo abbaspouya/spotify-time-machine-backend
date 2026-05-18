@@ -1,43 +1,25 @@
 import { ArrowRight, CheckCircle2, Languages, Library, WandSparkles } from "lucide-react"
 
+import { FeatureIntro } from "@/components/feature-intro"
 import { LanguageLab } from "@/features/advanced/language-lab"
 import { buttonVariants } from "@/components/ui/button"
+
+const languageIntroPoints = [
+  { title: "Scan liked songs", description: "Check your saved tracks for recognised language patterns." },
+  { title: "Pick a language", description: "Choose one detected group after reviewing the results." },
+  { title: "Create the playlist", description: "Save the selected language group to Spotify." },
+]
 
 export function LanguagePlaylistsPage() {
   return (
     <div className="container space-y-8 py-8 md:py-12">
       <section className="section-shell animate-fade-up overflow-hidden">
-        <div className="grid gap-8 rounded-[28px] border border-primary/15 bg-gradient-to-br from-primary/12 via-card to-card p-5 md:p-8 lg:grid-cols-[minmax(0,1fr)_420px]">
-          <div className="flex max-w-3xl flex-col justify-center space-y-5">
-            <div className="flex items-center gap-3 text-primary">
-              <Languages className="h-5 w-5" />
-              <p className="text-xs font-semibold uppercase tracking-[0.22em]">Language Playlists Beta</p>
-            </div>
-            <div className="space-y-4">
-              <h1 className="text-4xl leading-tight md:text-5xl">Create playlists from the languages in your liked songs.</h1>
-              <p className="text-base text-muted-foreground md:text-lg">
-                This beta scanner checks your liked songs, groups the languages it recognises, and lets you choose the
-                language you want to turn into a Spotify playlist.
-              </p>
-              <p className="text-base text-muted-foreground md:text-lg">
-                It uses the Python <span className="font-semibold text-foreground">langdetect</span> library. For each
-                song, the backend combines the track title with the artist names, asks langdetect for the most likely
-                language code, and skips songs where the text is too short or unclear to classify.
-              </p>
-              <p className="text-base text-muted-foreground md:text-lg">
-                Because song titles and artist names can be mixed-language or stylized, treat the result as a helpful
-                starting point and give the selected group a quick check before creating the playlist.
-              </p>
-            </div>
-            <div className="flex flex-wrap gap-3">
-              <a href="#language-lab" className={buttonVariants({ variant: "secondary" })}>
-                Open language builder
-                <ArrowRight className="h-4 w-4" />
-              </a>
-            </div>
-          </div>
-
-          <div className="rounded-[26px] border border-white/10 bg-background/55 p-5 shadow-panel">
+        <FeatureIntro
+          eyebrow="Language Playlists Beta"
+          icon={Languages}
+          points={languageIntroPoints}
+          title="Create playlists from the languages in your liked songs."
+          visual={
             <div className="space-y-4">
               <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
                 <div className="flex items-center gap-3">
@@ -94,8 +76,28 @@ export function LanguagePlaylistsPage() {
                 </p>
               </div>
             </div>
+          }
+        >
+          <p className="text-base text-muted-foreground md:text-lg">
+            This beta scanner checks your liked songs, groups the languages it recognises, and lets you choose the
+            language you want to turn into a Spotify playlist.
+          </p>
+          <p className="text-base text-muted-foreground md:text-lg">
+            It uses the Python <span className="font-semibold text-foreground">langdetect</span> library. For each
+            song, the backend combines the track title with the artist names, asks langdetect for the most likely
+            language code, and skips songs where the text is too short or unclear to classify.
+          </p>
+          <p className="text-base text-muted-foreground md:text-lg">
+            Because song titles and artist names can be mixed-language or stylized, treat the result as a helpful
+            starting point and give the selected group a quick check before creating the playlist.
+          </p>
+          <div className="flex flex-wrap gap-3">
+            <a href="#language-lab" className={buttonVariants({ variant: "secondary" })}>
+              Open language builder
+              <ArrowRight className="h-4 w-4" />
+            </a>
           </div>
-        </div>
+        </FeatureIntro>
       </section>
 
       <LanguageLab />

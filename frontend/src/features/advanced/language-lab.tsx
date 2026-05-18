@@ -65,6 +65,9 @@ export function LanguageLab() {
   const languageEntries = Object.entries(languageGroupsResult?.groups ?? {}).sort((left, right) => {
     return right[1].length - left[1].length
   })
+  const topLanguageEntries = languageEntries.slice(0, 3)
+  const selectedLanguageTrackIds =
+    selectedLanguage && languageGroupsResult?.groups[selectedLanguage] ? languageGroupsResult.groups[selectedLanguage] : null
 
   const handleCreateLanguagePlaylist = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -129,6 +132,45 @@ export function LanguageLab() {
             </p>
           ) : null}
 
+          {languageGroupsResult ? (
+            <div className="rounded-3xl border border-primary/20 bg-primary/8 p-4">
+              <div className="flex items-start gap-3">
+                <div className="mt-0.5 rounded-2xl bg-primary/12 p-2 text-primary">
+                  <CheckCircle2 className="h-5 w-5" />
+                </div>
+                <div>
+                  <p className="font-semibold text-foreground">Language scan ready</p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    {languageEntries.length
+                      ? `${languageEntries.length} language group${languageEntries.length === 1 ? "" : "s"} found. The largest groups are shown first.`
+                      : "No language groups were confident enough to show. Try again after adding more liked songs with clearer titles."}
+                  </p>
+                </div>
+              </div>
+
+              {topLanguageEntries.length ? (
+                <div className="mt-4 grid gap-2 sm:grid-cols-3">
+                  {topLanguageEntries.map(([languageCode, trackIds]) => (
+                    <button
+                      key={languageCode}
+                      className="rounded-2xl border border-white/10 bg-background/35 px-3 py-2 text-left transition-colors hover:border-primary/35"
+                      onClick={() => setSelectedLanguage(languageCode)}
+                      type="button"
+                    >
+                      <p className="font-semibold uppercase text-foreground">{languageCode}</p>
+                      <p className="text-xs text-muted-foreground">{trackIds.length} detected tracks</p>
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          ) : (
+            <div className="rounded-2xl border border-dashed border-white/10 bg-white/5 px-4 py-6 text-sm text-muted-foreground">
+              Run the scan to see the recognised language groups from your liked songs. You can select any group before
+              creating a playlist.
+            </div>
+          )}
+
           {languageEntries.length ? (
             <div className="grid max-h-[320px] gap-3 overflow-auto pr-1">
               {languageEntries.map(([languageCode, trackIds]) => {
@@ -179,7 +221,9 @@ export function LanguageLab() {
             <p className="text-sm font-medium text-foreground">Selected language</p>
             <p className="mt-2 text-lg font-semibold uppercase">{selectedLanguage || "No language selected yet"}</p>
             <p className="mt-1 text-sm text-muted-foreground">
-              Detection is based on track and artist text, so give the group a quick sanity check before creating a playlist.
+              {selectedLanguageTrackIds
+                ? `${selectedLanguageTrackIds.length} detected track${selectedLanguageTrackIds.length === 1 ? "" : "s"} will be used before the minimum-song check.`
+                : "Detection is based on track and artist text, so give the group a quick sanity check before creating a playlist."}
             </p>
           </div>
 

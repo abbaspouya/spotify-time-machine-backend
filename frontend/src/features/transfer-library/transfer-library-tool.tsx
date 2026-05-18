@@ -18,6 +18,7 @@ import { AuthRequiredNotice } from "@/features/spotify/auth-required-notice"
 import { JobStatusCard } from "@/features/jobs/job-status-card"
 import { isActiveJobStatus, useAsyncJob } from "@/features/jobs/use-async-job"
 import { getErrorMessage, useSpotifySession } from "@/features/spotify/use-spotify-session"
+import { FeatureIntro } from "@/components/feature-intro"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
@@ -66,6 +67,12 @@ const failureSummaryLabels: Array<{ key: keyof ImportSnapshotSummary; label: str
   { key: "liked_tracks_failed", label: "Liked song failures" },
   { key: "saved_albums_failed", label: "Album failures" },
   { key: "followed_artists_failed", label: "Artist follow failures" },
+]
+
+const transferIntroPoints = [
+  { title: "Choose the source", description: "Export all data or only the parts you need." },
+  { title: "Use another account", description: "Connect the target account directly on this page." },
+  { title: "Preview first", description: "Review additions and cleanup before importing." },
 ]
 
 type DownloadedSnapshotResponse = ExportSnapshotResponse & {
@@ -1085,45 +1092,12 @@ export function TransferLibraryTool() {
 
   return (
     <section id="transfer-tools" className="section-shell animate-fade-up overflow-hidden">
-      <div className="grid gap-8 rounded-[28px] border border-primary/15 bg-gradient-to-br from-primary/12 via-card to-card p-5 md:p-8 lg:grid-cols-[minmax(0,1fr)_430px]">
-        <div className="flex max-w-3xl flex-col justify-center space-y-5">
-          <div className="flex items-center gap-3 text-primary">
-            <RefreshCw className="h-5 w-5" />
-            <p className="text-xs font-semibold uppercase tracking-[0.22em]">Transfer Library</p>
-          </div>
-          <div className="space-y-4">
-            <h1 className="text-4xl leading-tight md:text-5xl">Move only the Spotify data you choose.</h1>
-            <p className="text-base text-muted-foreground md:text-lg">
-              Use this when you need to move from one Spotify account to another, or when you only want to send part of
-              a library instead of everything. Playlists, liked songs, saved albums, and followed artists can be
-              selected before anything is imported.
-            </p>
-            <p className="text-base text-muted-foreground md:text-lg">
-              Export a snapshot from the source account, sign in with the receiving account in the dedicated import
-              section, preview exactly what will change, then apply the transfer when it looks right.
-            </p>
-            <p className="text-base text-muted-foreground md:text-lg">
-              For smaller moves, the quick playlist section below lets you copy one playlist into another playlist or
-              into Liked Songs on the connected import account.
-            </p>
-          </div>
-          <div className="grid gap-4 border-t border-white/10 pt-5 sm:grid-cols-3">
-            <div className="space-y-1">
-              <p className="text-sm font-semibold text-foreground">Choose the source</p>
-              <p className="text-sm text-muted-foreground">Export all data or only the parts you need.</p>
-            </div>
-            <div className="space-y-1">
-              <p className="text-sm font-semibold text-foreground">Use another account</p>
-              <p className="text-sm text-muted-foreground">Connect the target account directly on this page.</p>
-            </div>
-            <div className="space-y-1">
-              <p className="text-sm font-semibold text-foreground">Preview first</p>
-              <p className="text-sm text-muted-foreground">Review additions and cleanup before importing.</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="rounded-[26px] border border-white/10 bg-background/55 p-5 shadow-panel">
+      <FeatureIntro
+        eyebrow="Transfer Library"
+        icon={RefreshCw}
+        points={transferIntroPoints}
+        title="Move only the Spotify data you choose."
+        visual={
           <div className="grid gap-4">
             <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
               <div className="flex items-center gap-3">
@@ -1171,8 +1145,22 @@ export function TransferLibraryTool() {
               </p>
             </div>
           </div>
-        </div>
-      </div>
+        }
+      >
+        <p className="text-base text-muted-foreground md:text-lg">
+          Use this when you need to move from one Spotify account to another, or when you only want to send part of a
+          library instead of everything. Playlists, liked songs, saved albums, and followed artists can be selected
+          before anything is imported.
+        </p>
+        <p className="text-base text-muted-foreground md:text-lg">
+          Export a snapshot from the source account, sign in with the receiving account in the dedicated import section,
+          preview exactly what will change, then apply the transfer when it looks right.
+        </p>
+        <p className="text-base text-muted-foreground md:text-lg">
+          For smaller moves, the quick playlist section below lets you copy one playlist into another playlist or into
+          Liked Songs on the connected import account.
+        </p>
+      </FeatureIntro>
 
       <div className="relative mt-8 grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
         <div className="pointer-events-none absolute bottom-10 left-1/2 top-10 hidden w-px -translate-x-1/2 bg-gradient-to-b from-primary/0 via-primary/25 to-primary/0 xl:block" />
