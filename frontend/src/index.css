@@ -36,16 +36,17 @@
   }
 
   body {
-    @apply min-h-screen bg-background font-body text-foreground antialiased;
+    @apply min-h-screen font-body text-foreground antialiased;
+    background-color: #04130d;
     background-image:
-      radial-gradient(circle at top left, rgba(29, 185, 84, 0.22), transparent 25%),
-      radial-gradient(circle at top right, rgba(148, 163, 184, 0.16), transparent 28%),
-      radial-gradient(circle at bottom center, rgba(255, 255, 255, 0.05), transparent 32%),
-      linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0)),
-      linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
-    background-size: auto, auto, auto, auto, 22px 22px, 22px 22px;
-    background-position: center, center, center, center, center, center;
+      linear-gradient(110deg, rgba(29, 185, 84, 0.18) 0%, transparent 30%, rgba(255, 255, 255, 0.045) 48%, transparent 68%),
+      linear-gradient(180deg, rgba(29, 185, 84, 0.08), rgba(5, 7, 11, 0.92) 58%, rgba(7, 18, 15, 1)),
+      repeating-linear-gradient(115deg, transparent 0, transparent 34px, rgba(255, 255, 255, 0.028) 35px, transparent 37px),
+      repeating-linear-gradient(25deg, transparent 0, transparent 58px, rgba(29, 185, 84, 0.04) 59px, transparent 61px),
+      linear-gradient(130deg, #04130d 0%, #07120f 42%, #07080d 100%);
+    background-attachment: fixed;
+    background-position: center;
+    background-size: cover;
   }
 
   #root {

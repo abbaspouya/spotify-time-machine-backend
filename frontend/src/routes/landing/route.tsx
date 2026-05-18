@@ -1,220 +1,229 @@
+import { useEffect, useRef, useState } from "react"
+import type { ReactNode } from "react"
 import {
+  ArrowDown,
   ArrowRight,
   ArrowRightLeft,
   CalendarRange,
-  Check,
+  CheckCircle2,
   Disc3,
   Languages,
-  LibraryBig,
-  ShieldCheck,
+  ListMusic,
 } from "lucide-react"
 import { Link } from "react-router-dom"
 
 import { Button, buttonVariants } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { useSpotifySession } from "@/features/spotify/use-spotify-session"
+import { cn } from "@/lib/utils"
 
-const productCards = [
+const storyFeatures = [
   {
     title: "Time Machine",
-    description: "Group liked songs by month, quarter, half-year, or year and turn the best slices into Spotify playlists.",
-    to: "/app/time-machine",
+    eyebrow: "Liked songs by time",
+    description: "Pick a month, quarter, half-year, or year from your listening history and turn that slice into a Spotify playlist.",
     icon: CalendarRange,
-    label: "Main flow",
+    accent: "01",
+    preview: ["Jan 2021", "Feb 2021", "Mar 2021"],
   },
   {
     title: "Transfer Library",
-    description: "Export a snapshot from one account, preview what matters, and apply it into another with clearer steps.",
-    to: "/app/transfer-library",
+    eyebrow: "Move between accounts",
+    description: "Export selected library data, connect the receiving account, preview the import plan, and apply only what you choose.",
     icon: ArrowRightLeft,
-    label: "Migration flow",
+    accent: "02",
+    preview: ["Playlists", "Liked songs", "Followed artists"],
   },
   {
     title: "Language Playlists",
-    description: "Scan liked songs by detected language, pick a group you want, and turn it into a playlist.",
-    to: "/app/language-playlists",
+    eyebrow: "Beta language scan",
+    description: "Scan liked songs for recognised language groups, choose one, and create a playlist from the matching tracks.",
     icon: Languages,
-    label: "Playlist builder",
+    accent: "03",
+    preview: ["IT", "EN", "FA"],
   },
 ] as const
 
-const steps = [
-  "Connect Spotify once so the app can work against your current account.",
-  "Choose the flow you want from the dashboard instead of sorting through every tool on the homepage.",
-  "Create time-capsule playlists, transfer a library, or build playlists around the language you want to hear.",
-] as const
+function ScrollReveal({
+  children,
+  className,
+  delay = 0,
+}: {
+  children: ReactNode
+  className?: string
+  delay?: number
+}) {
+  const [isVisible, setIsVisible] = useState(false)
+  const ref = useRef<HTMLDivElement | null>(null)
 
-const trustPoints = [
-  "Work from your own Spotify account instead of guessing how the tools behave on your library.",
-  "Create playlists directly inside Spotify when a time slice is worth keeping.",
-  "Preview transfer work before import so the migration flow stays easier to reason about.",
-] as const
+  useEffect(() => {
+    const element = ref.current
+    if (!element) {
+      return
+    }
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setIsVisible(true)
+          observer.unobserve(entry.target)
+        }
+      },
+      { rootMargin: "0px 0px -12% 0px", threshold: 0.18 },
+    )
+
+    observer.observe(element)
+    return () => observer.disconnect()
+  }, [])
+
+  return (
+    <div
+      ref={ref}
+      className={cn(
+        "transition-all duration-700 ease-out will-change-transform",
+        isVisible ? "translate-y-0 opacity-100 blur-0" : "translate-y-12 opacity-0 blur-sm",
+        className,
+      )}
+      style={{ transitionDelay: `${delay}ms` }}
+    >
+      {children}
+    </div>
+  )
+}
 
 export function LandingPage() {
   const { handleSpotifyLogin, isAuthenticated } = useSpotifySession()
 
   return (
-    <div className="container space-y-10 py-8 md:space-y-14 md:py-12">
-      <section className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
-        <div className="section-shell animate-fade-up overflow-hidden border-primary/20 bg-[linear-gradient(180deg,rgba(29,185,84,0.12),rgba(255,255,255,0.02)_30%,rgba(255,255,255,0))]">
-          <div className="flex flex-wrap items-center gap-3">
-            <span className="hero-badge">Spotify login first</span>
-            <span className="metric-pill">One connection, focused flows after</span>
-          </div>
-
-          <div className="mt-6 space-y-4">
-            <h1 className="max-w-4xl text-4xl leading-tight md:text-5xl lg:text-6xl">
-              Turn your Spotify library into time-capsule playlists and cleaner transfers.
-            </h1>
-            <p className="max-w-2xl text-base text-muted-foreground md:text-lg">
-              Connect once, then group liked songs by time, preview library snapshots before import, and build
-              language-based playlists without making the first screen feel like a dashboard.
-            </p>
-          </div>
-
-          <div className="mt-8 flex flex-wrap gap-3">
-            {isAuthenticated ? (
-              <Link to="/app" className={buttonVariants({ size: "lg" })}>
-                Open dashboard
-                <ArrowRight className="h-4 w-4" />
-              </Link>
-            ) : (
-              <Button size="lg" onClick={handleSpotifyLogin}>
-                <Disc3 className="h-4 w-4" />
-                Connect Spotify
-              </Button>
-            )}
-            <a href="#product-flows" className={buttonVariants({ variant: "outline", size: "lg" })}>
-              Explore the product
-            </a>
-          </div>
-
-          <div className="mt-8 flex flex-wrap gap-2 text-sm text-muted-foreground">
-            <span className="metric-pill">Liked songs into playlists</span>
-            <span className="metric-pill">Snapshot preview before import</span>
-            <span className="metric-pill">Language-based playlist builder</span>
-          </div>
-        </div>
-
-        <Card className="animate-fade-up overflow-hidden border-white/15 bg-card/92 [animation-delay:120ms]">
-          <CardHeader className="border-b border-white/10 pb-5">
-            <div className="flex items-center justify-between gap-3">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-foreground/55">Inside the dashboard</p>
-                <CardTitle className="mt-2">What opens after you connect</CardTitle>
+    <div className="relative isolate overflow-hidden">
+      <div className="container py-8 md:py-12">
+        <section id="spotify-login" className="min-h-[calc(100vh-8rem)] scroll-mt-28">
+          <div className="grid min-h-[calc(100vh-10rem)] place-items-center">
+            <div className="mx-auto max-w-5xl text-center">
+              <div className="mx-auto mb-8 flex h-20 w-20 items-center justify-center rounded-[28px] border border-primary/25 bg-primary text-primary-foreground shadow-glow">
+                <Disc3 className="h-9 w-9" />
               </div>
-              <div className="rounded-full border border-primary/25 bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
-                Spotify ready
+
+              <p className="text-xs font-semibold uppercase tracking-[0.28em] text-primary">Spotify login first</p>
+              <h1 className="mx-auto mt-5 max-w-4xl text-5xl leading-[0.98] md:text-7xl">
+                Turn your Spotify history into playlists, transfers, and better library control.
+              </h1>
+              <p className="mx-auto mt-6 max-w-2xl text-base text-muted-foreground md:text-xl">
+                Connect your Spotify account once, then use focused tools for time-based playlists, account-to-account
+                library moves, and beta language playlist creation.
+              </p>
+
+              <div className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
+                {isAuthenticated ? (
+                  <Link to="/app" className={buttonVariants({ size: "lg" })}>
+                    Open dashboard
+                    <ArrowRight className="h-4 w-4" />
+                  </Link>
+                ) : (
+                  <Button className="min-w-48" size="lg" onClick={handleSpotifyLogin}>
+                    <Disc3 className="h-4 w-4" />
+                    Connect Spotify
+                  </Button>
+                )}
+                <a href="#feature-story" className={buttonVariants({ variant: "outline", size: "lg" })}>
+                  See what unlocks
+                  <ArrowDown className="h-4 w-4" />
+                </a>
               </div>
             </div>
-            <CardDescription>
-              The homepage stays lean. The real navigation and account-specific work start after Spotify login.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="grid gap-3 pt-6">
-            {productCards.map(({ title, description, icon: Icon, label }) => (
-              <div
-                key={title}
-                className="rounded-3xl border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.06),rgba(255,255,255,0.02))] p-4"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex items-start gap-3">
-                    <div className="mt-0.5 flex h-10 w-10 items-center justify-center rounded-2xl bg-primary/12 text-primary">
-                      <Icon className="h-5 w-5" />
+          </div>
+        </section>
+
+        <section id="feature-story" className="scroll-mt-28 space-y-10 py-10 md:py-16">
+          <ScrollReveal className="mx-auto max-w-3xl text-center">
+            <p className="text-xs font-semibold uppercase tracking-[0.28em] text-foreground/55">After you connect</p>
+            <h2 className="mt-3 text-3xl md:text-5xl">The app appears one focused Spotify workflow at a time.</h2>
+            <p className="mt-4 text-muted-foreground md:text-lg">
+              Scroll through the story, then return to the top when you are ready to connect and use the tools with your
+              own library.
+            </p>
+          </ScrollReveal>
+
+          <div className="space-y-10">
+            {storyFeatures.map(({ accent, description, eyebrow, icon: Icon, preview, title }, index) => (
+              <ScrollReveal key={title} delay={index * 80}>
+                <article className="grid min-h-[440px] items-center gap-8 rounded-[30px] border border-white/10 bg-card/78 p-5 shadow-panel backdrop-blur-xl md:p-8 lg:grid-cols-[0.9fr_1.1fr]">
+                  <div className={index % 2 ? "lg:order-2" : undefined}>
+                    <div className="flex items-center gap-4">
+                      <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/12 text-primary">
+                        <Icon className="h-7 w-7" />
+                      </div>
+                      <div>
+                        <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary">{eyebrow}</p>
+                        <h3 className="mt-1 text-3xl md:text-4xl">{title}</h3>
+                      </div>
                     </div>
-                    <div>
-                      <p className="font-semibold text-foreground">{title}</p>
-                      <p className="mt-1 text-sm text-muted-foreground">{description}</p>
+                    <p className="mt-6 max-w-xl text-base text-muted-foreground md:text-lg">{description}</p>
+                  </div>
+
+                  <div className="relative overflow-hidden rounded-[28px] border border-white/10 bg-background/55 p-5">
+                    <div className="absolute right-5 top-5 font-display text-6xl text-primary/10">{accent}</div>
+                    <div className="relative space-y-4">
+                      <div className="flex items-center justify-between gap-3 border-b border-white/10 pb-4">
+                        <div className="flex items-center gap-3">
+                          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-primary text-primary-foreground">
+                            <ListMusic className="h-5 w-5" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-semibold text-foreground">{title}</p>
+                            <p className="text-xs text-muted-foreground">Ready after Spotify login</p>
+                          </div>
+                        </div>
+                        <CheckCircle2 className="h-5 w-5 text-primary" />
+                      </div>
+
+                      <div className="grid gap-3">
+                        {preview.map((item, previewIndex) => (
+                          <div
+                            key={item}
+                            className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/5 px-4 py-3"
+                          >
+                            <span className="text-sm font-medium text-foreground">{item}</span>
+                            <div className="h-2 w-24 overflow-hidden rounded-full bg-white/10">
+                              <div
+                                className="h-full rounded-full bg-primary"
+                                style={{ width: `${88 - previewIndex * 16}%` }}
+                              />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   </div>
-                  <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] font-medium text-foreground/70">
-                    {label}
-                  </span>
-                </div>
-              </div>
+                </article>
+              </ScrollReveal>
             ))}
-          </CardContent>
-        </Card>
-      </section>
+          </div>
+        </section>
 
-      <section id="product-flows" className="space-y-5">
-        <div className="space-y-2">
-          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-foreground/55">What you can do</p>
-          <h2 className="text-3xl md:text-4xl">Three focused ways to work with your Spotify library.</h2>
-          <p className="max-w-2xl text-muted-foreground">
-            Start with the product story here, then pick the exact workflow you want once you are inside the app.
-          </p>
-        </div>
-
-        <div className="grid gap-6 md:grid-cols-3">
-          {productCards.map(({ title, description, to, icon: Icon, label }) => (
-            <Card key={title} className="animate-fade-up border-white/10 bg-card/88">
-              <CardHeader>
-                <div className="mb-3 flex items-center justify-between gap-3">
-                  <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary/12 text-primary">
-                    <Icon className="h-5 w-5" />
-                  </div>
-                  <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] font-medium text-foreground/70">
-                    {label}
-                  </span>
-                </div>
-                <CardTitle>{title}</CardTitle>
-                <CardDescription>{description}</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Link to={to} className={buttonVariants({ variant: "secondary" })}>
-                  Open in dashboard
+        <section className="py-10 md:py-16">
+          <div className="mx-auto max-w-3xl rounded-[30px] border border-primary/20 bg-primary/8 p-6 text-center shadow-glow backdrop-blur md:p-10">
+            <p className="text-xs font-semibold uppercase tracking-[0.28em] text-primary">Ready to start</p>
+            <h2 className="mt-3 text-3xl md:text-5xl">Connect Spotify and let the dashboard become personal.</h2>
+            <p className="mx-auto mt-4 max-w-xl text-muted-foreground">
+              The public page stays simple. Your real playlists, account transfer choices, and language scans appear only
+              after Spotify login.
+            </p>
+            <div className="mt-8 flex justify-center">
+              {isAuthenticated ? (
+                <Link to="/app" className={buttonVariants({ size: "lg" })}>
+                  Open dashboard
                   <ArrowRight className="h-4 w-4" />
                 </Link>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      </section>
-
-      <section className="grid gap-6 lg:grid-cols-[1fr_1fr]">
-        <Card className="animate-fade-up border-white/10 bg-card/88 [animation-delay:120ms]">
-          <CardHeader>
-            <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/12 text-primary">
-              <LibraryBig className="h-6 w-6" />
+              ) : (
+                <a href="#spotify-login" className={buttonVariants({ size: "lg" })}>
+                  Back to Spotify login
+                  <ArrowDown className="h-4 w-4 rotate-180" />
+                </a>
+              )}
             </div>
-            <CardTitle>How it works</CardTitle>
-            <CardDescription>Keep the first screen simple, then let the dashboard handle the account-specific details.</CardDescription>
-          </CardHeader>
-          <CardContent className="grid gap-3">
-            {steps.map((step, index) => (
-              <div key={step} className="flex items-start gap-3 rounded-2xl border border-border bg-white/70 px-4 py-4">
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary text-sm font-semibold text-primary-foreground">
-                  {index + 1}
-                </div>
-                <p className="pt-1 text-sm text-muted-foreground">{step}</p>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-
-        <Card className="animate-fade-up border-white/10 bg-card/88 [animation-delay:180ms]">
-          <CardHeader>
-            <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/12 text-primary">
-              <ShieldCheck className="h-6 w-6" />
-            </div>
-            <CardTitle>Why start here</CardTitle>
-            <CardDescription>
-              This page keeps the first decision simple before you move into playlist building or transfer work.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="grid gap-3">
-            {trustPoints.map((point) => (
-              <div key={point} className="flex items-start gap-3 rounded-2xl border border-border bg-white/70 px-4 py-4">
-                <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/12 text-primary">
-                  <Check className="h-4 w-4" />
-                </div>
-                <p className="text-sm text-muted-foreground">{point}</p>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-      </section>
+          </div>
+        </section>
+      </div>
     </div>
   )
 }

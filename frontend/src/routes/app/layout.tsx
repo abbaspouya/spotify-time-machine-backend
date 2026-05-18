@@ -74,9 +74,6 @@ export function AppLayout() {
 
   return (
     <div className="relative isolate min-h-screen overflow-hidden">
-      <div className="pointer-events-none absolute inset-x-0 top-[-16rem] z-0 h-[30rem] bg-[radial-gradient(circle,_rgba(29,185,84,0.24),_transparent_58%)]" />
-      <div className="pointer-events-none absolute inset-x-0 top-[12rem] z-0 mx-auto h-[28rem] max-w-6xl rounded-full bg-[radial-gradient(circle,_rgba(148,163,184,0.16),_transparent_60%)] blur-3xl" />
-
       <header className="sticky top-0 z-20 border-b border-border/80 bg-background/92 backdrop-blur-xl">
         <div className="container py-4">
           <div className="flex items-center justify-between gap-4">

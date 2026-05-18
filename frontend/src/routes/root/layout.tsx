@@ -9,10 +9,6 @@ export function RootLayout() {
 
   return (
     <div className="relative isolate min-h-screen overflow-hidden">
-      <div className="pointer-events-none absolute inset-x-0 top-[-18rem] z-0 h-[34rem] bg-[radial-gradient(circle,_rgba(29,185,84,0.28),_transparent_58%)]" />
-      <div className="pointer-events-none absolute right-[-8rem] top-[8rem] z-0 h-[28rem] w-[28rem] rounded-full bg-[radial-gradient(circle,_rgba(244,244,245,0.16),_transparent_60%)] blur-3xl" />
-      <div className="pointer-events-none absolute left-[-10rem] top-[26rem] z-0 h-[24rem] w-[24rem] rounded-full bg-[radial-gradient(circle,_rgba(148,163,184,0.18),_transparent_60%)] blur-3xl" />
-
       <header className="sticky top-0 z-20 border-b border-border/70 bg-background/80 backdrop-blur-xl">
         <div className="container flex items-center justify-between py-4">
           <Link to="/" className="flex items-center gap-3">
