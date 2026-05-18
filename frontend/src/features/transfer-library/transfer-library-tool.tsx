@@ -18,12 +18,10 @@ import { AuthRequiredNotice } from "@/features/spotify/auth-required-notice"
 import { JobStatusCard } from "@/features/jobs/job-status-card"
 import { isActiveJobStatus, useAsyncJob } from "@/features/jobs/use-async-job"
 import { getErrorMessage, useSpotifySession } from "@/features/spotify/use-spotify-session"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { cn } from "@/lib/utils"
 
 const exportToggleFields = [
   { label: "Include playlists", key: "includePlaylists" },
@@ -661,22 +659,6 @@ export function TransferLibraryTool() {
   const previewRequiresConfirmation = Boolean(previewData?.requires_confirmation)
   const canStartImport =
     Boolean(previewData) && isTargetAuthenticated && (!previewRequiresConfirmation || importConfirmationChecked) && !isImporting
-  const snapshotReady = Boolean(snapshotFile || exportResult)
-
-  const transferFlowSteps = [
-    {
-      label: "Prepare snapshot",
-      state: snapshotReady ? "done" : "current",
-    },
-    {
-      label: "Preview import plan",
-      state: previewData ? "done" : snapshotReady ? "current" : "pending",
-    },
-    {
-      label: "Apply transfer",
-      state: importResult ? "done" : previewData ? "current" : "pending",
-    },
-  ] as const
 
   const handleUseExportForImport = () => {
     if (!exportResult?.snapshot) {
@@ -1103,51 +1085,93 @@ export function TransferLibraryTool() {
 
   return (
     <section id="transfer-tools" className="section-shell animate-fade-up overflow-hidden">
-      <div className="flex flex-wrap items-center gap-3">
-        <span className="hero-badge">Source and target accounts</span>
-        <Badge variant={importResult ? "default" : snapshotReady ? "secondary" : "outline"}>
-          {importResult ? "Transfer applied" : snapshotReady ? "Snapshot ready" : "Prepare a snapshot"}
-        </Badge>
-      </div>
-
-      <div className="mt-6 space-y-4">
-        <h2 className="max-w-3xl text-3xl leading-tight md:text-4xl">Prepare the snapshot, review the plan, then apply the transfer.</h2>
-        <p className="max-w-3xl text-base text-muted-foreground md:text-lg">
-          Use a fresh export from the source account or bring a snapshot you already downloaded. Then preview the exact
-          changes before the import starts touching the target account.
-        </p>
-      </div>
-
-      <div className="mt-8 flex items-center gap-3 overflow-x-auto pb-2">
-        {transferFlowSteps.map((step, index) => (
-          <div key={step.label} className="flex items-center gap-3">
-            <div
-              className={cn(
-                "flex min-w-fit items-center gap-2 rounded-full border px-3 py-2 text-sm font-medium whitespace-nowrap transition-colors",
-                step.state === "done"
-                  ? "border-primary/30 bg-primary/12 text-primary"
-                  : step.state === "current"
-                    ? "border-white/15 bg-white/8 text-foreground"
-                    : "border-white/10 bg-transparent text-foreground/55",
-              )}
-            >
-              <span
-                className={cn(
-                  "flex h-6 w-6 items-center justify-center rounded-full text-xs font-semibold",
-                  step.state === "done"
-                    ? "bg-primary text-primary-foreground"
-                    : step.state === "current"
-                      ? "bg-white/10 text-foreground"
-                      : "bg-white/5 text-foreground/60",
-                )}
-              >
-                {index + 1}
-              </span>
-              {step.label}
-            </div>
-            {index < transferFlowSteps.length - 1 ? <div className="h-px w-10 shrink-0 bg-gradient-to-r from-primary/35 to-white/10" /> : null}
+      <div className="grid gap-8 rounded-[28px] border border-primary/15 bg-gradient-to-br from-primary/12 via-card to-card p-5 md:p-8 lg:grid-cols-[minmax(0,1fr)_430px]">
+        <div className="flex max-w-3xl flex-col justify-center space-y-5">
+          <div className="flex items-center gap-3 text-primary">
+            <RefreshCw className="h-5 w-5" />
+            <p className="text-xs font-semibold uppercase tracking-[0.22em]">Transfer Library</p>
           </div>
-        ))}
+          <div className="space-y-4">
+            <h1 className="text-4xl leading-tight md:text-5xl">Move only the Spotify data you choose.</h1>
+            <p className="text-base text-muted-foreground md:text-lg">
+              Use this when you need to move from one Spotify account to another, or when you only want to send part of
+              a library instead of everything. Playlists, liked songs, saved albums, and followed artists can be
+              selected before anything is imported.
+            </p>
+            <p className="text-base text-muted-foreground md:text-lg">
+              Export a snapshot from the source account, sign in with the receiving account in the dedicated import
+              section, preview exactly what will change, then apply the transfer when it looks right.
+            </p>
+            <p className="text-base text-muted-foreground md:text-lg">
+              For smaller moves, the quick playlist section below lets you copy one playlist into another playlist or
+              into Liked Songs on the connected import account.
+            </p>
+          </div>
+          <div className="grid gap-4 border-t border-white/10 pt-5 sm:grid-cols-3">
+            <div className="space-y-1">
+              <p className="text-sm font-semibold text-foreground">Choose the source</p>
+              <p className="text-sm text-muted-foreground">Export all data or only the parts you need.</p>
+            </div>
+            <div className="space-y-1">
+              <p className="text-sm font-semibold text-foreground">Use another account</p>
+              <p className="text-sm text-muted-foreground">Connect the target account directly on this page.</p>
+            </div>
+            <div className="space-y-1">
+              <p className="text-sm font-semibold text-foreground">Preview first</p>
+              <p className="text-sm text-muted-foreground">Review additions and cleanup before importing.</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="rounded-[26px] border border-white/10 bg-background/55 p-5 shadow-panel">
+          <div className="grid gap-4">
+            <div className="rounded-3xl border border-white/10 bg-white/5 p-4">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-primary/15 text-primary">
+                  <Download className="h-5 w-5" />
+                </div>
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-foreground/55">Source account</p>
+                  <p className="font-semibold text-foreground">Create a snapshot</p>
+                </div>
+              </div>
+              <div className="mt-4 grid gap-2 text-sm text-muted-foreground">
+                <div className="flex items-center justify-between rounded-2xl border border-white/10 bg-background/35 px-3 py-2">
+                  <span>Playlists</span>
+                  <CheckCircle2 className="h-4 w-4 text-primary" />
+                </div>
+                <div className="flex items-center justify-between rounded-2xl border border-white/10 bg-background/35 px-3 py-2">
+                  <span>Liked songs</span>
+                  <CheckCircle2 className="h-4 w-4 text-primary" />
+                </div>
+                <div className="flex items-center justify-between rounded-2xl border border-white/10 bg-background/35 px-3 py-2">
+                  <span>Followed artists</span>
+                  <CheckCircle2 className="h-4 w-4 text-primary" />
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-center text-primary">
+              <ArrowRight className="h-5 w-5" />
+            </div>
+
+            <div className="rounded-3xl border border-primary/20 bg-primary/8 p-4">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-primary text-primary-foreground">
+                  <FileUp className="h-5 w-5" />
+                </div>
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-foreground/55">Target account</p>
+                  <p className="font-semibold text-foreground">Preview, then import</p>
+                </div>
+              </div>
+              <p className="mt-4 text-sm text-muted-foreground">
+                The target login lives in the import section, so you can switch to the account that should receive the
+                library before applying the transfer.
+              </p>
+            </div>
+          </div>
+        </div>
       </div>
 
       <div className="relative mt-8 grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">

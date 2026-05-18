@@ -7,7 +7,6 @@ import { appendPlaylist, getCurrentUserPlaylists } from "@/lib/api"
 import type { AppendPlaylistResponse, PlaylistSummary } from "@/lib/types"
 import { AuthRequiredNotice } from "@/features/spotify/auth-required-notice"
 import { getErrorMessage, useSpotifySession } from "@/features/spotify/use-spotify-session"
-import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Select } from "@/components/ui/select"
@@ -210,20 +209,28 @@ export function PlaylistDropInTool() {
 
   return (
     <section id="playlist-drop-in-tool" className="section-shell animate-fade-up overflow-hidden">
-      <div className="flex flex-wrap items-center gap-3">
-        <span className="hero-badge">Quick Add-On</span>
-        <Badge variant={appendPlaylistMutation.data ? "default" : "outline"}>
-          {appendPlaylistMutation.data ? "Playlist added" : "One playlist at a time"}
-        </Badge>
-      </div>
+      <div className="grid gap-5 rounded-[28px] border border-white/10 bg-white/5 p-5 md:p-6 lg:grid-cols-[minmax(0,1fr)_300px] lg:items-center">
+        <div className="space-y-4">
+          <div className="flex items-center gap-3 text-primary">
+            <ArrowRight className="h-5 w-5" />
+            <p className="text-xs font-semibold uppercase tracking-[0.22em]">One playlist move</p>
+          </div>
+          <div className="space-y-3">
+            <h2 className="max-w-3xl text-3xl leading-tight md:text-4xl">Move one playlist into Liked Songs or another playlist.</h2>
+            <p className="max-w-3xl text-base text-muted-foreground md:text-lg">
+              Use this when you do not need a full library transfer. Connect the account you want to work in, choose
+              one source playlist, then add its songs into Liked Songs or into another playlist in that account.
+            </p>
+          </div>
+        </div>
 
-      <div className="mt-6 space-y-4">
-        <h2 className="max-w-3xl text-3xl leading-tight md:text-4xl">Drop one playlist into Liked Songs or another playlist.</h2>
-        <p className="max-w-3xl text-base text-muted-foreground md:text-lg">
-          This works inside the connected import account. Make a playlist on your phone or in Time Machine, then use
-          this page to push that one playlist into Liked Songs or another playlist with the new songs landing at the
-          top of the target playlist.
-        </p>
+        <div className="rounded-3xl border border-primary/20 bg-primary/8 p-4">
+          <p className="text-sm font-semibold text-foreground">Uses the import account</p>
+          <p className="mt-2 text-sm text-muted-foreground">
+            The connect button below lets you switch to another Spotify account before choosing the playlist and
+            destination.
+          </p>
+        </div>
       </div>
 
       <div className="mt-8 grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
