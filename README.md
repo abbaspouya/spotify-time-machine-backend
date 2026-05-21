@@ -273,3 +273,7 @@ Workflow: [ci.yml](.github/workflows/ci.yml)
 ## Deployment
 
 Deployment notes are available in [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md). If you deploy this publicly, review Spotify's current developer requirements first and avoid presenting the app as a commercial service unless you have the necessary approvals.
+
+## License
+
+This project is released under the [MIT License](LICENSE).
