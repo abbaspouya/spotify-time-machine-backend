@@ -4,6 +4,7 @@ import { Link, NavLink, Navigate, Outlet } from "react-router-dom"
 
 import { Button, buttonVariants } from "@/components/ui/button"
 import { formatExpiresAt, getErrorMessage, useSpotifySession } from "@/features/spotify/use-spotify-session"
+import { IS_DEMO_MODE } from "@/lib/api"
 import { cn } from "@/lib/utils"
 
 import { primaryNavigation } from "../root/navigation"
@@ -83,6 +84,9 @@ export function AppLayout() {
               </div>
               <div>
                 <p className="font-display text-2xl text-foreground">Spotify Time Machine</p>
+                {IS_DEMO_MODE ? (
+                  <p className="mt-0.5 text-xs font-semibold uppercase tracking-[0.18em] text-primary">Demo mode</p>
+                ) : null}
               </div>
             </Link>
 

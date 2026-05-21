@@ -20,6 +20,7 @@ import type {
   TopTracksResponse,
   WhoAmI,
 } from "@/lib/types"
+import { demoRequest } from "@/lib/demo-api"
 
 const fallbackBaseUrl =
   typeof window === "undefined"
@@ -27,6 +28,7 @@ const fallbackBaseUrl =
     : `${window.location.protocol}//${window.location.hostname}:8000`
 
 export const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || fallbackBaseUrl).replace(/\/$/, "")
+export const IS_DEMO_MODE = import.meta.env.VITE_DEMO_MODE === "true"
 const SPOTIFY_RATE_LIMIT_STORAGE_KEY = "spotify_api_rate_limit_until"
 const SPOTIFY_RATE_LIMIT_EVENT = "spotify-rate-limit-updated"
 const DEFAULT_SPOTIFY_RATE_LIMIT_COOLDOWN_SECONDS = 60
@@ -122,6 +124,10 @@ function buildQuery(params: Record<string, string | number | undefined>) {
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   getSpotifyRateLimitUntil()
 
+  if (IS_DEMO_MODE) {
+    return demoRequest<T>(path, init)
+  }
+
   const response = await fetch(`${API_BASE_URL}${path}`, {
     credentials: "include",
     ...init,
@@ -183,6 +189,10 @@ function buildAccountRoleQuery(accountRole?: SpotifyAccountRole) {
 }
 
 export function getLoginUrl(options?: LoginUrlOptions) {
+  if (IS_DEMO_MODE) {
+    return options?.returnTo || "/app"
+  }
+
   const query = buildQuery({
     account_role: options?.accountRole,
     return_to: options?.returnTo,

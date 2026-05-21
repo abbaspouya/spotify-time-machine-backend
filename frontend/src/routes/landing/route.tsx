@@ -14,6 +14,7 @@ import { Link } from "react-router-dom"
 
 import { Button, buttonVariants } from "@/components/ui/button"
 import { useSpotifySession } from "@/features/spotify/use-spotify-session"
+import { IS_DEMO_MODE } from "@/lib/api"
 import { cn } from "@/lib/utils"
 
 const storyFeatures = [
@@ -115,13 +116,13 @@ export function LandingPage() {
               <div className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
                 {isAuthenticated ? (
                   <Link to="/app" className={buttonVariants({ size: "lg" })}>
-                    Open dashboard
+                    {IS_DEMO_MODE ? "Open demo dashboard" : "Open dashboard"}
                     <ArrowRight className="h-4 w-4" />
                   </Link>
                 ) : (
                   <Button className="min-w-48" size="lg" onClick={handleSpotifyLogin}>
                     <Disc3 className="h-4 w-4" />
-                    Connect Spotify
+                    {IS_DEMO_MODE ? "Enter demo mode" : "Connect Spotify"}
                   </Button>
                 )}
                 <a href="#feature-story" className={buttonVariants({ variant: "outline", size: "lg" })}>
@@ -211,7 +212,7 @@ export function LandingPage() {
             <div className="mt-8 flex justify-center">
               {isAuthenticated ? (
                 <Link to="/app" className={buttonVariants({ size: "lg" })}>
-                  Open dashboard
+                  {IS_DEMO_MODE ? "Open demo dashboard" : "Open dashboard"}
                   <ArrowRight className="h-4 w-4" />
                 </Link>
               ) : (

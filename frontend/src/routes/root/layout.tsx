@@ -3,6 +3,7 @@ import { Link, Outlet } from "react-router-dom"
 
 import { Button } from "@/components/ui/button"
 import { useSpotifySession } from "@/features/spotify/use-spotify-session"
+import { IS_DEMO_MODE } from "@/lib/api"
 
 export function RootLayout() {
   const { handleSpotifyLogin, isAuthenticated } = useSpotifySession()
@@ -19,6 +20,11 @@ export function RootLayout() {
               <p className="font-display text-lg text-foreground">Spotify Time Machine</p>
               <p className="text-xs font-semibold uppercase tracking-[0.2em] text-foreground/55">Time-based playlists and cleaner transfers</p>
             </div>
+            {IS_DEMO_MODE ? (
+              <span className="hidden rounded-full border border-primary/25 bg-primary/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-primary sm:inline-flex">
+                Demo mode
+              </span>
+            ) : null}
           </Link>
 
           <div className="flex items-center gap-2">
@@ -33,7 +39,7 @@ export function RootLayout() {
             ) : (
               <Button size="sm" onClick={handleSpotifyLogin}>
                 <Disc3 className="h-4 w-4" />
-                Connect Spotify
+                {IS_DEMO_MODE ? "Enter demo" : "Connect Spotify"}
               </Button>
             )}
           </div>

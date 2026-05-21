@@ -107,6 +107,8 @@ spotify-time-machine/
     showcase/
     DEPLOYMENT.md
     PRIVACY.md
+  docker-compose.yml
+  docker-compose.demo.yml
   .github/workflows/
   README.md
 ```
@@ -184,7 +186,36 @@ Example local frontend `.env`:
 
 ```env
 VITE_API_BASE_URL=http://127.0.0.1:8000
+VITE_DEMO_MODE=false
 ```
+
+## Demo Mode
+
+Demo mode lets people explore the UI without Spotify credentials. It uses sample data in the frontend and does not call the backend or Spotify.
+
+For local frontend development, set this in `frontend/.env`:
+
+```env
+VITE_DEMO_MODE=true
+VITE_API_BASE_URL=http://127.0.0.1:8000
+```
+
+Then run only the frontend:
+
+```powershell
+cd frontend
+npm run dev
+```
+
+Open `http://127.0.0.1:5173` and use the demo dashboard. Playlist creation, transfer previews, imports, and language scans are simulated.
+
+You can also run the demo with Docker without creating `backend/.env`:
+
+```powershell
+docker compose -f docker-compose.demo.yml up --build
+```
+
+To return to real Spotify mode, set `VITE_DEMO_MODE=false` and run the backend with valid Spotify credentials.
 
 ## Run With Docker Compose
 

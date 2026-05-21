@@ -31,6 +31,8 @@ async function main() {
   const apiSource = await read("src/lib/api.ts")
 
   assert.match(apiSource, /credentials:\s*"include"/)
+  assert.match(apiSource, /VITE_DEMO_MODE/)
+  assert.match(apiSource, /demoRequest/)
   assert.match(apiSource, /\/jobs\/fetch_and_group/)
   assert.match(apiSource, /\/jobs\/group_by_language/)
   assert.match(apiSource, /\/jobs\/export_account_snapshot/)
@@ -52,6 +54,13 @@ async function main() {
 
   assert.match(playlistDropInSource, /One playlist move/)
   assert.match(playlistDropInSource, /Add playlist into target/)
+
+  const demoApiSource = await read("src/lib/demo-api.ts")
+
+  assert.match(demoApiSource, /\/auth_status/)
+  assert.match(demoApiSource, /\/top_tracks/)
+  assert.match(demoApiSource, /\/preview_account_snapshot_import/)
+  assert.match(demoApiSource, /\/playlists\/append/)
 }
 
 main().catch((error) => {
