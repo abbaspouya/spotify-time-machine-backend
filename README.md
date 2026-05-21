@@ -2,7 +2,7 @@
 
 Spotify Time Machine is a full-stack Spotify library utility for creating time-based playlists, moving selected library data between accounts, and experimenting with beta language-based playlist creation.
 
-It is built as a portfolio-quality, self-hosted showcase rather than a monetized SaaS product. Spotify API access, review, quotas, and commercial use are governed by Spotify's own developer platform requirements, so this project is presented honestly as an engineering and product-design case study.
+It is built as a usable self-hosted app: clone it, create your own Spotify Developer app, add your credentials to `.env`, and run it locally. It also works well as a portfolio-quality engineering and product-design case study because the full product lives in this repository.
 
 ![Spotify Time Machine landing page](docs/showcase/screenshots/landing.png)
 
@@ -35,6 +35,25 @@ This app turns those jobs into focused workflows:
 1. Connect Spotify.
 2. Choose the job you want to do.
 3. Preview or select the result before the app writes anything meaningful back to Spotify.
+
+## Use It Yourself
+
+This is not a hosted public SaaS. If you want to use it, you run your own local copy and connect it to your own Spotify Developer app credentials.
+
+Current Spotify platform notes:
+
+- Spotify's Web API documentation says you need a Spotify Premium account to use the Web API; for development-mode apps, Spotify also notes that the app owner must have Premium.
+- Newly created Spotify apps start in development mode. Spotify documents this mode as suitable for apps under construction or apps that manage one account.
+- In development mode, Spotify currently allows up to 5 authenticated users, and each user has to be added to the app allowlist before API calls work for them.
+- If you deploy the app for a wider audience, review Spotify's quota modes, policy, and terms first.
+
+Useful official links:
+
+- [Spotify Web API](https://developer.spotify.com/documentation/web-api)
+- [Spotify Apps guide](https://developer.spotify.com/documentation/web-api/concepts/apps)
+- [Spotify Redirect URIs guide](https://developer.spotify.com/documentation/web-api/concepts/redirect_uri)
+- [Spotify Authorization Code Flow](https://developer.spotify.com/documentation/web-api/tutorials/code-flow)
+- [Spotify Quota Modes](https://developer.spotify.com/documentation/web-api/concepts/quota-modes)
 
 ## Product Notes
 
@@ -74,7 +93,7 @@ The practical result: this repository is best used as a self-hosted personal too
 ## Repo Layout
 
 ```text
-Spotify/
+spotify-time-machine/
   backend/
     app/
     requirements.txt
@@ -94,9 +113,33 @@ Spotify/
 
 ## Local Setup
 
+### 1. Create A Spotify Developer App
+
+1. Go to the [Spotify Developer Dashboard](https://developer.spotify.com/dashboard).
+2. Log in with the Spotify account you want to use as the app owner.
+3. Create a new app.
+4. Choose **Web API** when Spotify asks which API or SDK you plan to use.
+5. Open the app settings and add this redirect URI:
+
+```text
+http://127.0.0.1:8000/callback
+```
+
+Spotify's redirect URI rules require an exact match. For local development, use `127.0.0.1` rather than `localhost`.
+
+6. Copy the app's **Client ID** and **Client Secret**. Keep the client secret private.
+
+If another person wants to use your development-mode app, add their Spotify account in the app's user allowlist in the Spotify Developer Dashboard.
+
 ### Backend Environment
 
 Copy [backend/.env.example](backend/.env.example) to `backend/.env` and fill in your Spotify app credentials.
+
+PowerShell:
+
+```powershell
+Copy-Item backend/.env.example backend/.env
+```
 
 Important values:
 
@@ -114,9 +157,34 @@ Session and job settings can also be tuned:
 - `JOB_RETENTION_SECONDS`
 - `LOG_LEVEL`
 
+Example local backend `.env`:
+
+```env
+SPOTIFY_CLIENT_ID=your_spotify_client_id
+SPOTIFY_CLIENT_SECRET=your_spotify_client_secret
+SPOTIFY_REDIRECT_URI=http://127.0.0.1:8000/callback
+FRONTEND_URL=http://127.0.0.1:5173
+```
+
+Do not commit your real `.env` file. The repository includes `.env.example` files for documentation, while real `.env` files are ignored.
+
+The Spotify client secret belongs only in `backend/.env`. Do not put it in the frontend environment, screenshots, commits, issues, or public posts.
+
 ### Frontend Environment
 
 Copy [frontend/.env.example](frontend/.env.example) to `frontend/.env` if you want to override the backend URL.
+
+PowerShell:
+
+```powershell
+Copy-Item frontend/.env.example frontend/.env
+```
+
+Example local frontend `.env`:
+
+```env
+VITE_API_BASE_URL=http://127.0.0.1:8000
+```
 
 ## Install
 

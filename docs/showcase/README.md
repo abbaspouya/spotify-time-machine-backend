@@ -21,7 +21,7 @@ Spotify Time Machine started as a practical library-management problem: Spotify 
 - Transfer Library exports selected account data, previews the import plan, and applies it into another account with clearer control.
 - Language Playlists is a beta workflow that uses `langdetect` to group liked songs by likely language and create playlists from the chosen group.
 
-The project is best presented as a portfolio and self-hosted utility rather than a commercial SaaS product, because Spotify API access, quotas, review, and commercial use are controlled by Spotify's developer platform policies.
+The project is best presented as a usable self-hosted utility and portfolio case study rather than a commercial SaaS product, because Spotify API access, quotas, review, and commercial use are controlled by Spotify's developer platform policies.
 
 ## What To Emphasize
 
