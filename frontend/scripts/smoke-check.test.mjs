@@ -25,7 +25,7 @@ async function main() {
   assert.match(navigationSource, /Dashboard/)
   assert.match(navigationSource, /Time Machine/)
   assert.match(navigationSource, /Transfer Library/)
-  assert.match(navigationSource, /Advanced/)
+  assert.match(navigationSource, /Language Playlists/)
   assert.doesNotMatch(navigationSource, /Overview/)
 
   const apiSource = await read("src/lib/api.ts")
@@ -50,7 +50,7 @@ async function main() {
 
   const playlistDropInSource = await read("src/features/transfer-library/playlist-drop-in-tool.tsx")
 
-  assert.match(playlistDropInSource, /One playlist at a time/)
+  assert.match(playlistDropInSource, /One playlist move/)
   assert.match(playlistDropInSource, /Add playlist into target/)
 }
 
